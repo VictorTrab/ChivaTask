@@ -1,11 +1,19 @@
 """Hoja de estilos Qt compartida por la presentacion."""
 
 STYLESHEET = """
-QMainWindow, QWidget {
+QMainWindow, #appRoot, #contentRoot, QStackedWidget {
     background: #F5F7FA;
     color: #102033;
     font-family: "Segoe UI", Arial, sans-serif;
     font-size: 13px;
+}
+QWidget {
+    color: #102033;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 13px;
+}
+QLabel {
+    background: transparent;
 }
 #sidebar {
     background: #123F35;
@@ -313,7 +321,7 @@ QTreeWidget::item:selected, QListWidget::item:selected {
     font-size: 12px;
 }
 #toggleOn, #toggleOff {
-    border: none;
+    border: 1px solid transparent;
     border-radius: 14px;
     font-size: 12px;
     font-weight: 900;
@@ -584,8 +592,11 @@ QCheckBox {
 """
 
 DARK_OVERRIDES = """
-QMainWindow, QWidget {
+QMainWindow, #appRoot, #contentRoot, QStackedWidget {
     background: #101820;
+    color: #E5EEF7;
+}
+QWidget {
     color: #E5EEF7;
 }
 #sidebar {

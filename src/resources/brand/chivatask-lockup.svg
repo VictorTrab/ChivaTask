@@ -8,5 +8,5 @@
   <path d="M48 30V40" stroke="#D97706" stroke-width="4" stroke-linecap="round"/>
   <path d="M30 40L35 45L44 36" stroke="#D1FAE5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="78" y="34" fill="#102033" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="800">ChivaTask</text>
-  <text x="78" y="54" fill="#64748B" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600">Gestor de pendientes academicos</text>
+  <text x="78" y="54" fill="#64748B" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600">Gestor de pendientes académicos</text>
 </svg>

@@ -66,6 +66,7 @@ from .componentes.prototipo import (
 )
 from .componentes.tarjetas import DetailPanel, StatCard
 from .dialogo_login import LoginDialog
+from .dialogo_onboarding import OnboardingDialog
 from .animaciones import set_animations_enabled
 from .estilos import app_stylesheet
 from .logo import BrandLockup, logo_icon
@@ -138,6 +139,7 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         root = QWidget()
+        root.setObjectName("appRoot")
         root_layout = QHBoxLayout(root)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
@@ -173,6 +175,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(self.version_label)
 
         content = QWidget()
+        content.setObjectName("contentRoot")
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
@@ -225,7 +228,7 @@ class MainWindow(QMainWindow):
         banner.setObjectName("errorBanner")
         layout = QHBoxLayout(banner)
         layout.setContentsMargins(24, 8, 24, 8)
-        self.error_label = QLabel("Sin conexion a Moodle - Mostrando datos en cache")
+        self.error_label = QLabel("Sin conexión a Moodle - Mostrando datos en caché")
         retry = QPushButton("Reintentar")
         retry.setObjectName("linkButton")
         retry.clicked.connect(self.sync_now)
@@ -329,7 +332,6 @@ class MainWindow(QMainWindow):
 
         left = QWidget()
         left.setMinimumWidth(560)
-        left.setMinimumWidth(560)
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(10)
@@ -381,7 +383,7 @@ class MainWindow(QMainWindow):
         self.snooze_button.setAccessibleName("Posponer recordatorio")
         self.snooze_button.setToolTip("Elegir cuando recordar esta tarea")
         self.snooze_menu = QMenu(self.snooze_button)
-        for label, days in (("Recordar manana", 1), ("Recordar en 3 dias", 3), ("Recordar en 1 semana", 7)):
+        for label, days in (("Recordar mañana", 1), ("Recordar en 3 días", 3), ("Recordar en 1 semana", 7)):
             action = QAction(label, self.snooze_menu)
             action.triggered.connect(lambda _checked=False, snooze_days=days: self.snooze_selected(snooze_days))
             self.snooze_menu.addAction(action)
@@ -472,7 +474,7 @@ class MainWindow(QMainWindow):
         self.settings_stack = QStackedWidget()
         for title, page in (
             ("Perfil y Campus", self._settings_profile_page()),
-            ("Sincronizacion", self._settings_sync_page()),
+            ("Sincronización", self._settings_sync_page()),
             ("Notificaciones", self._settings_notifications_page()),
             ("Privacidad y Datos", self._settings_privacy_page()),
             ("Apariencia", self._settings_appearance_page()),
@@ -493,7 +495,7 @@ class MainWindow(QMainWindow):
         change = PrimaryButton("Cambiar perfil", self.icons.icon("user_switch"))
         change.setMaximumWidth(180)
         change.clicked.connect(self.change_profile)
-        logout = SecondaryButton("Cerrar sesion local", self.icons.icon("logout"))
+        logout = SecondaryButton("Cerrar sesión local", self.icons.icon("logout"))
         logout.setObjectName("dangerButton")
         logout.setMaximumWidth(210)
         logout.clicked.connect(self.logout_local)
@@ -503,7 +505,7 @@ class MainWindow(QMainWindow):
         return page
 
     def _settings_sync_page(self) -> QWidget:
-        page = self._settings_page("Sincronizacion", "Controla frecuencia y arranque automatico")
+        page = self._settings_page("Sincronización", "Controla frecuencia y arranque automático")
         sync_toggle = ToggleSwitch(self.settings.setting_bool("sync_on_start", True))
         sync_toggle.toggled_value.connect(lambda v: self.settings.set_setting_bool("sync_on_start", v))
         self.start_windows_check = ToggleSwitch(self.autostart.enabled())
@@ -515,7 +517,7 @@ class MainWindow(QMainWindow):
         self.interval_combo.currentIndexChanged.connect(self._interval_changed)
         page.layout().addWidget(SettingsRow("Sincronizar al iniciar la app", "Consulta Moodle cada vez que abres ChivaTask", sync_toggle))
         page.layout().addWidget(SettingsRow("Iniciar con Windows", "ChivaTask arranca en la bandeja del sistema al encender el equipo", self.start_windows_check))
-        page.layout().addWidget(SettingsRow("Intervalo de sincronizacion", "Frecuencia de consulta automatica en segundo plano", self.interval_combo))
+        page.layout().addWidget(SettingsRow("Intervalo de sincronización", "Frecuencia de consulta automática en segundo plano", self.interval_combo))
         page.layout().addWidget(PrimaryButton("Sincronizar", self.icons.icon("refresh")))
         page.layout().itemAt(page.layout().count() - 1).widget().clicked.connect(self.sync_now)
         self.sync_history = QLabel("")
@@ -538,20 +540,20 @@ class MainWindow(QMainWindow):
             self.notif_mode.addItem(text, value)
         self._select_combo_value(self.notif_mode, self.settings.notification_mode())
         self.notif_mode.currentIndexChanged.connect(lambda: self.settings.set_notification_mode(self.notif_mode.currentData()))
-        page.layout().addWidget(SettingsRow("Modo de notificaciones", "Como y cuando enviar las alertas del sistema", self.notif_mode))
-        test = SecondaryButton("Enviar notificacion de prueba", self.icons.icon("bell"))
+        page.layout().addWidget(SettingsRow("Modo de notificaciones", "Cómo y cuándo enviar las alertas del sistema", self.notif_mode))
+        test = SecondaryButton("Enviar notificación de prueba", self.icons.icon("bell"))
         test.clicked.connect(lambda: self.notifier.notify_changed(self.tasks[:1]) if self.tasks else self.status_pill.setText("No hay tareas para probar"))
         page.layout().addWidget(test)
         return page
 
     def _settings_privacy_page(self) -> QWidget:
         page = self._settings_page("Privacidad y Datos Locales", "ChivaTask guarda todo en este equipo")
-        data = QLabel(f"Credenciales: Windows Credential Manager\nCache local: SQLite\nRuta: {self.repository.path}\nDatos externos: nada sale de este equipo")
+        data = QLabel(f"Credenciales: Windows Credential Manager\nCaché local: SQLite\nRuta: {self.repository.path}\nDatos externos: nada sale de este equipo")
         data.setObjectName("settingsCard")
         data.setWordWrap(True)
         open_folder = SecondaryButton("Abrir carpeta de datos")
         open_folder.clicked.connect(self.open_data_folder)
-        clear = SecondaryButton("Limpiar cache local")
+        clear = SecondaryButton("Limpiar caché local")
         clear.setObjectName("dangerButton")
         clear.clicked.connect(self.clear_cache_local)
         page.layout().addWidget(data)
@@ -569,9 +571,9 @@ class MainWindow(QMainWindow):
         return page
 
     def _settings_about_page(self) -> QWidget:
-        page = self._settings_page("Acerca de", "Tu campus academico, sin excusas.")
+        page = self._settings_page("Acerca de", "Tu campus académico, sin excusas.")
         about = QLabel(
-            "ChivaTask es una aplicacion local para gestionar pendientes academicos.\n\n"
+            "ChivaTask es una aplicación local para gestionar pendientes académicos.\n\n"
             "Stack real: Python 3.11+, PySide6 / Qt Widgets, Moodle REST API oficial, "
             "SQLite local y Windows Credential Manager.\n\n"
             "Herramienta personal no oficial. No tiene afiliacion ni respaldo institucional de UPH."
@@ -632,9 +634,9 @@ class MainWindow(QMainWindow):
     def ensure_login_and_sync(self) -> None:
         if not self.credentials.has_credentials():
             if self.settings.onboarding_completed():
-                accepted = LoginDialog(self.credentials, self).exec() == QDialog.Accepted
+                accepted = self._exec_login_dialog()
             else:
-                accepted = OnboardingDialog(self.credentials, self).exec() == QDialog.Accepted
+                accepted = self._exec_onboarding_dialog()
                 if accepted:
                     self.awaiting_onboarding_sync = True
             if not accepted:
@@ -682,12 +684,12 @@ class MainWindow(QMainWindow):
             self.awaiting_onboarding_sync = False
             self.api_status = "error"
             self.last_error_code = result.error_code
-            self.error_label.setText(f"Sin conexion a Moodle - Mostrando datos en cache ({result.error_code})")
+            self.error_label.setText(f"Sin conexión a Moodle - Mostrando datos en caché ({result.error_code})")
             self.error_banner.show()
             self._set_data_state("offline-cache" if result.pending_count or result.course_count else "recoverable-error")
-            self._set_status("Sin conexion", "error")
+            self._set_status("Sin conexión", "error")
             if result.error_code == "invalidlogin":
-                LoginDialog(self.credentials, self).exec()
+                self._exec_login_dialog()
 
     def _notify_changed(self, tasks: list[Task]) -> None:
         if not tasks:
@@ -727,8 +729,8 @@ class MainWindow(QMainWindow):
         if last and self.api_status != "error":
             self._set_status("Sincronizado", "ok")
         self.health_label.setText(
-            f"Moodle API: {'sin conexion' if self.api_status == 'error' else 'conectado'}\n"
-            f"Cache local: SQLite activo\nCredenciales: Credential Manager"
+            f"Moodle API: {'sin conexión' if self.api_status == 'error' else 'conectado'}\n"
+            f"Caché local: SQLite activo\nCredenciales: Credential Manager"
         )
         self._refresh_profile_summary()
         self.refresh_inicio_sections()
@@ -780,7 +782,7 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "home_sections_layout"):
             return
         today = date.today()
-        dias = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
+        dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
         meses = [
             "enero",
             "febrero",
@@ -803,7 +805,7 @@ class MainWindow(QMainWindow):
         if next_task:
             self.next_deadline_card.show()
             self.next_deadline_text.setText(
-                f"PROXIMA ENTREGA - {relative_due_text(next_task.due_at)}\n"
+                f"PRÓXIMA ENTREGA - {relative_due_text(next_task.due_at)}\n"
                 f"{next_task.name}\n{next_task.course_shortname} - {unix_to_local_text(next_task.due_at)}"
             )
         else:
@@ -855,7 +857,7 @@ class MainWindow(QMainWindow):
                 self.task_list_layout.addWidget(EmptyState("Sin resultados", "No hay tareas para este filtro.", self.icons.icon("tasks")))
             else:
                 self._set_data_state("empty")
-                self.task_list_layout.addWidget(EmptyState("Sin tareas", "No hay tareas pendientes en cache.", self.icons.icon("tasks")))
+                self.task_list_layout.addWidget(EmptyState("Sin tareas", "No hay tareas pendientes en caché.", self.icons.icon("tasks")))
         for course, items in self.queries.grouped_by_course(self.filtered_tasks):
             group = QFrame()
             group.setObjectName("taskGroup")
@@ -1040,7 +1042,7 @@ class MainWindow(QMainWindow):
         until = now_ts() + int(timedelta(days=days).total_seconds())
         self.repository.snooze(self.selected_task.assignment_id, until)
         self.refresh_from_cache()
-        self._set_status(f"Recordatorio pospuesto {days} dia(s)", "pending")
+        self._set_status(f"Recordatorio pospuesto {days} día(s)", "pending")
 
     def change_profile(self) -> None:
         try:
@@ -1048,18 +1050,28 @@ class MainWindow(QMainWindow):
         except CredentialError as exc:
             QMessageBox.critical(self, "Credential Manager", str(exc))
             return
-        if LoginDialog(self.credentials, self).exec() == QDialog.Accepted:
+        if self._exec_login_dialog():
             self.sync_now()
+
+    def _exec_login_dialog(self) -> bool:
+        dialog = LoginDialog(self.credentials)
+        dialog.setStyleSheet(self.styleSheet())
+        return dialog.exec() == QDialog.Accepted
+
+    def _exec_onboarding_dialog(self) -> bool:
+        dialog = OnboardingDialog(self.credentials)
+        dialog.setStyleSheet(self.styleSheet())
+        return dialog.exec() == QDialog.Accepted
 
     def logout_local(self) -> None:
         modal = ConfirmModal(
-            "Cerrar sesion local",
-            "Esto elimina credenciales, token y cache academica de este equipo. No borra nada en Moodle.",
+            "Cerrar sesión local",
+            "Esto elimina credenciales, token y caché académica de este equipo. No borra nada en Moodle.",
             self,
         )
         cancel = SecondaryButton("Cancelar")
         cancel.clicked.connect(modal.reject)
-        logout = PrimaryButton("Cerrar sesion")
+        logout = PrimaryButton("Cerrar sesión")
         logout.setObjectName("dangerPrimaryButton")
         logout.clicked.connect(modal.accept)
         modal.layout.addWidget(cancel)
@@ -1081,13 +1093,13 @@ class MainWindow(QMainWindow):
 
     def clear_cache_local(self) -> None:
         modal = ConfirmModal(
-            "Limpiar cache local",
-            "Se eliminaran cursos, tareas y estado de notificaciones. Credenciales y ajustes se conservan.",
+            "Limpiar caché local",
+            "Se eliminarán cursos, tareas y estado de notificaciones. Credenciales y ajustes se conservan.",
             self,
         )
         cancel = SecondaryButton("Cancelar")
         cancel.clicked.connect(modal.reject)
-        clear = PrimaryButton("Limpiar cache")
+        clear = PrimaryButton("Limpiar caché")
         clear.setObjectName("dangerPrimaryButton")
         clear.clicked.connect(modal.accept)
         modal.layout.addWidget(cancel)
@@ -1095,7 +1107,7 @@ class MainWindow(QMainWindow):
         if modal.exec() == QDialog.Accepted:
             self.repository.clear_academic_cache()
             self.refresh_from_cache()
-            self._set_status("Cache local eliminada", "pending")
+            self._set_status("Caché local eliminada", "pending")
 
     def open_data_folder(self) -> None:
         path = self.repository.path
@@ -1124,8 +1136,8 @@ class MainWindow(QMainWindow):
             "success": "Datos actualizados",
             "empty": "Sin tareas pendientes",
             "filtered-empty": "Sin resultados para el filtro",
-            "offline-cache": "Sin conexion, usando cache",
-            "recoverable-error": "Error recuperable de sincronizacion",
+            "offline-cache": "Sin conexión, usando caché",
+            "recoverable-error": "Error recuperable de sincronización",
             "blocking-error": "Accion bloqueada",
         }
         if hasattr(self, "data_state_label"):
@@ -1140,7 +1152,7 @@ class MainWindow(QMainWindow):
 
     def _greeting_for_hour(self, hour: int) -> str:
         if 5 <= hour < 12:
-            return "Buenos dias"
+            return "Buenos días"
         if 12 <= hour < 18:
             return "Buenas tardes"
         return "Buenas noches"
@@ -1159,9 +1171,9 @@ class MainWindow(QMainWindow):
         last = self.repository.get_state("last_successful_sync_at")
         error = self.repository.get_state("last_error_code")
         self.sync_history.setText(
-            "Historial de sincronizacion\n"
-            f"Ultima correcta: {unix_to_local_text(int(last)) if last else 'Sin registro'}\n"
-            f"Ultimo error: {error or 'Ninguno'}"
+            "Historial de sincronización\n"
+            f"Última correcta: {unix_to_local_text(int(last)) if last else 'Sin registro'}\n"
+            f"Último error: {error or 'Ninguno'}"
         )
 
     def _interval_changed(self) -> None:
@@ -1199,83 +1211,6 @@ class MainWindow(QMainWindow):
             self.tray.show_background_message()
         else:
             super().closeEvent(event)
-
-
-class OnboardingDialog(BaseModal):
-    def __init__(self, credentials: CredentialRepository, parent: QWidget | None = None) -> None:
-        super().__init__("Bienvenido a ChivaTask", parent)
-        self.credentials = credentials
-        self.setMinimumWidth(440)
-        self.stack = QStackedWidget()
-        self.stack.addWidget(self._welcome_page())
-        self.stack.addWidget(self._login_page())
-        self.stack.addWidget(self._ready_page())
-        self.layout.addWidget(self.stack)
-
-    def _welcome_page(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.addWidget(BrandLockup())
-        title = QLabel("Tu campus academico, sin excusas.")
-        title.setObjectName("detailTitle")
-        text = QLabel("ChivaTask detecta tareas sin entrega en Moodle, sincroniza en segundo plano y te avisa cuando hay cambios importantes.")
-        text.setWordWrap(True)
-        start = PrimaryButton("Comenzar")
-        start.clicked.connect(lambda: self.stack.setCurrentIndex(1))
-        layout.addWidget(title)
-        layout.addWidget(text)
-        layout.addWidget(start)
-        return page
-
-    def _login_page(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        self.username = QLineEdit()
-        self.username.setPlaceholderText("usuario@uph.edu.hn")
-        self.password = QLineEdit()
-        self.password.setPlaceholderText("Contrasena del campus")
-        self.password.setEchoMode(QLineEdit.Password)
-        info = QLabel("Tus credenciales se guardan en Windows Credential Manager, no en archivos del proyecto.")
-        info.setWordWrap(True)
-        connect = PrimaryButton("Conectar")
-        connect.clicked.connect(self._save_credentials)
-        back = SecondaryButton("Volver")
-        back.clicked.connect(lambda: self.stack.setCurrentIndex(0))
-        layout.addWidget(QLabel("Conecta tu campus"))
-        layout.addWidget(self.username)
-        layout.addWidget(self.password)
-        layout.addWidget(info)
-        layout.addWidget(connect)
-        layout.addWidget(back)
-        return page
-
-    def _ready_page(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        title = QLabel("Todo listo")
-        title.setObjectName("detailTitle")
-        text = QLabel("La primera sincronizacion se ejecutara al entrar a ChivaTask.")
-        text.setWordWrap(True)
-        done = PrimaryButton("Ir a ChivaTask")
-        done.clicked.connect(self.accept)
-        layout.addWidget(title)
-        layout.addWidget(text)
-        layout.addWidget(done)
-        return page
-
-    def _save_credentials(self) -> None:
-        username = self.username.text().strip()
-        password = self.password.text()
-        if not username or not password:
-            QMessageBox.warning(self, "Datos incompletos", "Ingresa usuario y contrasena.")
-            return
-        try:
-            self.credentials.save_credentials(username, password)
-            self.credentials.clear_token()
-        except CredentialError as exc:
-            QMessageBox.critical(self, "Credential Manager", str(exc))
-            return
-        self.stack.setCurrentIndex(2)
 
 
 class CommandPalette(BaseModal):

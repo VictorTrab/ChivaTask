@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QProgressBar
 
 from domain.modelos import Course, StoredCredentials, SyncResult, Task
 from infrastructure.persistence import SQLiteTaskRepository
@@ -18,9 +18,11 @@ from presentation.qt.componentes.prototipo import (
     SettingsRow,
     TaskRowCard,
     ToggleSwitch,
+    ProgressRing,
 )
 from presentation.qt.dialogo_login import LoginDialog
-from presentation.qt.ventana_principal import CommandPalette, MainWindow, OnboardingDialog
+from presentation.qt.dialogo_onboarding import OnboardingDialog
+from presentation.qt.ventana_principal import CommandPalette, MainWindow
 
 
 class FakeCredentials:
@@ -149,6 +151,7 @@ class PresentationSmokeTests(unittest.TestCase):
     def test_login_dialog_builds(self):
         dialog = LoginDialog(WindowsCredentialRepository("uph_pendientes_test_no_write"))
         self.assertEqual(dialog.windowTitle(), "Conecta tu campus")
+        self.assertEqual(dialog.password.placeholderText(), "Contraseña del campus")
 
     def test_onboarding_dialog_builds(self):
         dialog = OnboardingDialog(FakeCredentials())
@@ -196,8 +199,14 @@ class PresentationSmokeTests(unittest.TestCase):
             row,
         ]
         self.assertTrue(toggle.isChecked())
+        self.assertEqual(toggle.text(), "")
         for widget in widgets:
             self.assertIsNotNone(widget.objectName())
+
+    def test_progress_ring_is_not_a_progress_bar_wrapper(self):
+        ring = ProgressRing(67, "Progreso global")
+        self.assertEqual(ring.value, 67)
+        self.assertEqual(ring.findChildren(QProgressBar), [])
 
     def test_pill_filter_tracks_selected_value(self):
         pills = PillFilter([("Todas", "todas"), ("Urgentes", "urgentes")], "todas")
@@ -391,7 +400,7 @@ class PresentationSmokeTests(unittest.TestCase):
             self.assertEqual(window.course_search.accessibleName(), "Buscar cursos")
             self.assertEqual(window.sync_button.accessibleName(), "Sincronizar tareas")
             self.assertEqual(window.data_state_label.property("dataState"), "empty")
-            self.assertEqual(window._greeting_for_hour(9), "Buenos dias")
+            self.assertEqual(window._greeting_for_hour(9), "Buenos días")
             self.assertEqual(window._greeting_for_hour(15), "Buenas tardes")
             self.assertEqual(window._greeting_for_hour(22), "Buenas noches")
             window.close()

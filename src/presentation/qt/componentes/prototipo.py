@@ -5,8 +5,8 @@ from __future__ import annotations
 from calendar import monthrange
 from datetime import datetime
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFontMetrics, QIcon
+from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -50,8 +50,8 @@ def relative_due_text(due_at: int | None) -> str:
     if diff_days == 0:
         return "Hoy"
     if diff_days == 1:
-        return "Manana"
-    return f"En {diff_days} dias"
+        return "Mañana"
+    return f"En {diff_days} días"
 
 
 def elided(text: str, max_chars: int) -> str:
@@ -219,7 +219,7 @@ class CourseCard(QFrame):
         titles.addWidget(code)
         titles.addWidget(name)
 
-        status = StatusChip("Al dia" if pending == 0 else "Pendiente", "ok" if pending == 0 else "overdue")
+        status = StatusChip("Al día" if pending == 0 else "Pendiente", "ok" if pending == 0 else "overdue")
         status.setMaximumWidth(92)
         header.addWidget(initials)
         header.addLayout(titles, 1)
@@ -287,6 +287,8 @@ class ToggleSwitch(QPushButton):
         self._checked = checked
         self.setCheckable(True)
         self.setFixedSize(48, 28)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAccessibleName("Interruptor")
         self.clicked.connect(self._emit)
         self.setChecked(checked)
 
@@ -308,6 +310,30 @@ class ToggleSwitch(QPushButton):
         self.setText("")
         self.style().unpolish(self)
         self.style().polish(self)
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        enabled = self.isEnabled()
+        track = QColor("#16775F" if self._checked else "#CBD5E1")
+        if not enabled:
+            track = QColor("#E2E8F0")
+        if self.underMouse() and enabled:
+            track = QColor("#0F5F4A" if self._checked else "#94A3B8")
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(track)
+        rect = QRectF(1, 1, self.width() - 2, self.height() - 2)
+        painter.drawRoundedRect(rect, 13, 13)
+        knob_size = 22
+        knob_x = self.width() - knob_size - 3 if self._checked else 3
+        knob = QRectF(knob_x, 3, knob_size, knob_size)
+        painter.setBrush(QColor("#FFFFFF" if enabled else "#F8FAFC"))
+        painter.drawEllipse(knob)
+        if self.hasFocus():
+            painter.setPen(QPen(QColor("#6EE7B7"), 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 12, 12)
 
 
 class ThemeToggleButton(QPushButton):
@@ -413,29 +439,44 @@ class ProgressRing(QFrame):
     def __init__(self, value: int, label: str) -> None:
         super().__init__()
         self.setObjectName("progressRing")
+        self.value = max(0, min(100, value))
+        self.label = label
         self.setMinimumHeight(156)
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignCenter)
-        self.value_label = QLabel(f"{value}%")
-        self.value_label.setObjectName("progressRingValue")
-        self.value_label.setAlignment(Qt.AlignCenter)
-        self.label_label = QLabel(label)
-        self.label_label.setObjectName("progressRingLabel")
-        self.label_label.setAlignment(Qt.AlignCenter)
-        self.label_label.setWordWrap(True)
-        self.bar = QProgressBar()
-        self.bar.setObjectName("ringBar")
-        self.bar.setRange(0, 100)
-        self.bar.setValue(value)
-        layout.addWidget(self.value_label)
-        layout.addWidget(self.label_label)
-        layout.addWidget(self.bar)
+        self.setMinimumWidth(156)
 
     def update_value(self, value: int, label: str | None = None) -> None:
-        self.value_label.setText(f"{value}%")
-        self.bar.setValue(value)
+        self.value = max(0, min(100, value))
         if label:
-            self.label_label.setText(label)
+            self.label = label
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        size = min(self.width(), self.height()) - 42
+        x = (self.width() - size) / 2
+        y = 18
+        rect = QRectF(x, y, size, size)
+        track_pen = QPen(QColor("#E8EEF4"), 10)
+        track_pen.setCapStyle(Qt.RoundCap)
+        value_pen = QPen(QColor("#16775F"), 10)
+        value_pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(track_pen)
+        painter.drawArc(rect, 0, 360 * 16)
+        painter.setPen(value_pen)
+        painter.drawArc(rect, 90 * 16, int(-360 * 16 * self.value / 100))
+        text_color = self.palette().color(self.foregroundRole())
+        painter.setPen(text_color)
+        value_font = QFont("Segoe UI", 18, QFont.Bold)
+        painter.setFont(value_font)
+        painter.drawText(rect, Qt.AlignCenter, f"{self.value}%")
+        muted = QColor("#9FB0C3") if text_color.lightness() > 180 else QColor("#64748B")
+        painter.setPen(muted)
+        label_font = QFont("Segoe UI", 9, QFont.DemiBold)
+        painter.setFont(label_font)
+        label_rect = QRectF(12, rect.bottom() + 8, self.width() - 24, 26)
+        painter.drawText(label_rect, Qt.AlignCenter | Qt.TextWordWrap, self.label)
 
 
 class MiniCalendar(QFrame):

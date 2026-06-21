@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFormLayout, QLabel, QLineEdit, QMessageBox, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QWidget
 
 from application.puertos import CredentialRepository
 from shared.errores import CredentialError
@@ -24,34 +24,45 @@ class LoginDialog(BaseModal):
         self.username.setPlaceholderText("usuario@uph.edu.hn")
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.Password)
-        self.password.setPlaceholderText("Contrasena del campus")
+        self.password.setPlaceholderText("Contraseña del campus")
+        self.password_toggle = QPushButton("Mostrar")
+        self.password_toggle.setObjectName("secondarySmallButton")
+        self.password_toggle.setCheckable(True)
+        self.password_toggle.clicked.connect(self._toggle_password)
 
         save = PrimaryButton("Conectar")
+        save.setDefault(True)
         save.clicked.connect(self.save)
         cancel = SecondaryButton("Cancelar")
         cancel.clicked.connect(self.reject)
 
         form = QFormLayout()
         form.addRow("Usuario", self.username)
-        form.addRow("Contrasena", self.password)
+        password_row = QHBoxLayout()
+        password_row.addWidget(self.password, 1)
+        password_row.addWidget(self.password_toggle)
+        form.addRow("Contraseña", password_row)
 
         title = QLabel("Conecta tu campus")
         title.setObjectName("detailTitle")
         subtitle = QLabel(f"{APP_DISPLAY_NAME} usa tus credenciales solo en este equipo.")
         subtitle.setWordWrap(True)
-        subtitle.setStyleSheet("color: #64748B;")
+        subtitle.setObjectName("muted")
         info = QLabel("Tus credenciales se guardan en Windows Credential Manager, no en archivos del proyecto.")
         info.setWordWrap(True)
-        info.setStyleSheet("color: #64748B;")
+        info.setObjectName("settingsCard")
 
         self.layout.addWidget(BrandLockup())
         self.layout.addWidget(title)
         self.layout.addWidget(subtitle)
         self.layout.addLayout(form)
         self.layout.addWidget(info)
-        self.layout.addWidget(save)
-        self.layout.addWidget(cancel)
+        actions = QHBoxLayout()
+        actions.addWidget(cancel)
+        actions.addWidget(save)
+        self.layout.addLayout(actions)
         self.layout.setAlignment(Qt.AlignTop)
+        self.username.setFocus()
 
     def showEvent(self, event):
         self._fade = fade_in(self)
@@ -61,7 +72,7 @@ class LoginDialog(BaseModal):
         username = self.username.text().strip()
         password = self.password.text()
         if not username or not password:
-            QMessageBox.warning(self, "Datos incompletos", "Ingresa usuario y contrasena.")
+            QMessageBox.warning(self, "Datos incompletos", "Ingresa usuario y contraseña.")
             return
         try:
             self.credentials.save_credentials(username, password)
@@ -70,3 +81,8 @@ class LoginDialog(BaseModal):
             QMessageBox.critical(self, "Credential Manager", str(exc))
             return
         self.accept()
+
+    def _toggle_password(self) -> None:
+        visible = self.password_toggle.isChecked()
+        self.password.setEchoMode(QLineEdit.Normal if visible else QLineEdit.Password)
+        self.password_toggle.setText("Ocultar" if visible else "Mostrar")
