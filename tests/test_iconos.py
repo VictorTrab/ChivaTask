@@ -6,8 +6,8 @@ from PySide6.QtWidgets import QApplication
 
 from PySide6.QtGui import QIcon
 
-from uph_pendientes.presentation.qt.logo import lockup_path, logo_icon, logo_path
-from uph_pendientes.presentation.qt.registro_iconos import IconRegistry
+from presentation.qt.logo import lockup_path, logo_icon, logo_path
+from presentation.qt.registro_iconos import IconRegistry
 
 
 class IconRegistryTests(unittest.TestCase):

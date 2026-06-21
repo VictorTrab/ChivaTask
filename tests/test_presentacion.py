@@ -7,10 +7,10 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from uph_pendientes.domain.modelos import Course, StoredCredentials, SyncResult, Task
-from uph_pendientes.infrastructure.persistence import SQLiteTaskRepository
-from uph_pendientes.infrastructure.security import WindowsCredentialRepository
-from uph_pendientes.presentation.qt.componentes.prototipo import (
+from domain.modelos import Course, StoredCredentials, SyncResult, Task
+from infrastructure.persistence import SQLiteTaskRepository
+from infrastructure.security import WindowsCredentialRepository
+from presentation.qt.componentes.prototipo import (
     CourseCard,
     MiniCalendar,
     PillFilter,
@@ -18,8 +18,8 @@ from uph_pendientes.presentation.qt.componentes.prototipo import (
     TaskRowCard,
     ToggleSwitch,
 )
-from uph_pendientes.presentation.qt.dialogo_login import LoginDialog
-from uph_pendientes.presentation.qt.ventana_principal import CommandPalette, MainWindow, OnboardingDialog
+from presentation.qt.dialogo_login import LoginDialog
+from presentation.qt.ventana_principal import CommandPalette, MainWindow, OnboardingDialog
 
 
 class FakeCredentials:
@@ -74,6 +74,24 @@ class FakeAutostart:
         self.value = enabled
 
 
+class FakeNavigator:
+    def __init__(self) -> None:
+        self.urls = []
+        self.folders = []
+
+    def open_url(self, url):
+        self.urls.append(url)
+        return url.startswith("https://campus.uph.edu.hn")
+
+    def open_campus_home(self):
+        self.urls.append("home")
+        return True
+
+    def open_folder(self, path):
+        self.folders.append(path)
+        return True
+
+
 class PresentationSmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -87,6 +105,7 @@ class PresentationSmokeTests(unittest.TestCase):
                     repo,
                     FakeCredentials(),
                     FakeNotifier(),
+                    FakeNavigator(),
                     FakeAutostart(),
                     lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
                     21600,
@@ -119,6 +138,7 @@ class PresentationSmokeTests(unittest.TestCase):
                 repo,
                 FakeCredentials(),
                 FakeNotifier(),
+                FakeNavigator(),
                 FakeAutostart(),
                 lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
                 21600,
@@ -163,25 +183,133 @@ class PresentationSmokeTests(unittest.TestCase):
     def test_open_data_folder_uses_repository_parent(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            navigator = FakeNavigator()
             window = MainWindow(
                 repo,
                 FakeCredentials(),
                 FakeNotifier(),
+                navigator,
                 FakeAutostart(),
                 lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
                 21600,
             )
-            calls = []
-            import os
+            window.open_data_folder()
+            self.assertEqual(navigator.folders, [Path(tmp)])
+            window.close()
+            repo.close()
 
-            original = getattr(os, "startfile", None)
-            os.startfile = lambda path: calls.append(path)  # type: ignore[attr-defined]
-            try:
-                window.open_data_folder()
-            finally:
-                if original is not None:
-                    os.startfile = original  # type: ignore[attr-defined]
-            self.assertEqual(calls, [str(Path(tmp))])
+    def test_onboarding_is_marked_complete_after_successful_sync(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(True, 0, 0, []),
+                21600,
+            )
+            window.awaiting_onboarding_sync = True
+
+            window._sync_finished(SyncResult(True, 0, 0, []))
+
+            self.assertTrue(window.settings.onboarding_completed())
+            self.assertFalse(window.awaiting_onboarding_sync)
+            window.close()
+            repo.close()
+
+    def test_visual_preferences_apply_dark_compact_stylesheet(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            repo.set_setting("visual_mode", "oscuro")
+            repo.set_setting("ui_density", "compacta")
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            stylesheet = window.styleSheet()
+
+            self.assertIn("#101820", stylesheet)
+            self.assertIn("font-size: 12px", stylesheet)
+            window.close()
+            repo.close()
+
+    def test_responsive_layout_hides_side_panels_on_small_width(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            window.resize(1000, 680)
+            window._apply_responsive_layout()
+
+            self.assertFalse(window.task_detail.isVisible())
+            self.assertEqual(window.sidebar.width(), 176)
+            window.close()
+            repo.close()
+
+    def test_ui_state_labels_accessibility_and_greeting(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            window.refresh_task_list()
+
+            self.assertEqual(window.task_search.accessibleName(), "Buscar tareas")
+            self.assertEqual(window.course_search.accessibleName(), "Buscar cursos")
+            self.assertEqual(window.sync_button.accessibleName(), "Sincronizar tareas")
+            self.assertEqual(window.data_state_label.property("dataState"), "empty")
+            self.assertEqual(window._greeting_for_hour(9), "Buenos dias")
+            self.assertEqual(window._greeting_for_hour(15), "Buenas tardes")
+            self.assertEqual(window._greeting_for_hour(22), "Buenas noches")
+            window.close()
+            repo.close()
+
+    def test_snooze_accepts_explicit_day_options(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            repo.upsert_courses([Course(1, "IS", "Curso", True)])
+            task = Task(10, 1, "IS", "Curso", "Tarea", None, None, "new")
+            repo.upsert_tasks([task])
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+            window.selected_task = task
+
+            window.snooze_selected(3)
+
+            snoozed = repo.pending_tasks()[0].snoozed_until
+            self.assertIsNotNone(snoozed)
+            self.assertGreaterEqual(int(snoozed), 3 * 86400)
+            self.assertGreaterEqual(len(window.snooze_menu.actions()), 3)
             window.close()
             repo.close()
 

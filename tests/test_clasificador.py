@@ -2,8 +2,8 @@
 
 import unittest
 
-from uph_pendientes.domain.modelos import Task, TaskBucket
-from uph_pendientes.domain.politica_tareas import classify_task, sort_pending
+from domain.modelos import Task, TaskBucket
+from domain.politica_tareas import classify_task, sort_pending
 
 
 def task(assignment_id: int, due_at, status="new") -> Task:

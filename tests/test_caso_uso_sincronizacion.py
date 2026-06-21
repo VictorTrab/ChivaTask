@@ -2,10 +2,10 @@
 
 import unittest
 
-from uph_pendientes.application.caso_uso_sincronizacion import SyncUseCase
-from uph_pendientes.domain.modelos import StoredCredentials
-from uph_pendientes.infrastructure.persistence import SQLiteTaskRepository
-from uph_pendientes.shared.errores import CampusError, MissingCredentialsError
+from application.caso_uso_sincronizacion import SyncUseCase
+from domain.modelos import StoredCredentials
+from infrastructure.persistence import SQLiteTaskRepository
+from shared.errores import CampusError, MissingCredentialsError
 
 
 class FakeCredentials:
@@ -39,6 +39,8 @@ class FakeCampus:
         self.invalid_first = invalid_first
         self.submitted = submitted
         self.site_calls = 0
+        self.status_calls = 0
+        self.status_bulk_calls = 0
 
     def login(self, username, password):
         return "new-token"
@@ -56,8 +58,17 @@ class FakeCampus:
         return [{"id": 1, "assignments": [{"id": 10, "name": "Tarea", "duedate": 0, "url": None}]}]
 
     def submission_status(self, token, assignment_id):
+        self.status_calls += 1
         status = "submitted" if self.submitted else "new"
         return {"lastattempt": {"submission": {"status": status}}}
+
+    def submission_statuses(self, token, assignment_ids):
+        self.status_bulk_calls += 1
+        status = "submitted" if self.submitted else "new"
+        return {
+            assignment_id: {"lastattempt": {"submission": {"status": status}}}
+            for assignment_id in assignment_ids
+        }
 
 
 class SyncUseCaseTests(unittest.TestCase):
@@ -91,6 +102,17 @@ class SyncUseCaseTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(result.pending_count, 0)
         self.assertEqual(repo.pending_tasks(), [])
+        repo.close()
+
+    def test_sync_uses_bulk_submission_status_lookup(self):
+        repo = SQLiteTaskRepository(":memory:")
+        campus = FakeCampus()
+
+        result = SyncUseCase(repo, FakeCredentials(), campus).execute()
+
+        self.assertTrue(result.ok)
+        self.assertEqual(campus.status_bulk_calls, 1)
+        self.assertEqual(campus.status_calls, 0)
         repo.close()
 
 

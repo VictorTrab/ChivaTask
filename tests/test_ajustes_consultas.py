@@ -5,11 +5,11 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
-from uph_pendientes.ajustes import SettingsService
-from uph_pendientes.application.consultas_tareas import TaskQueries
-from uph_pendientes.domain.modelos import Course, Task, TaskBucket
-from uph_pendientes.domain.tiempo import now_ts
-from uph_pendientes.infrastructure.persistence import SQLiteTaskRepository
+from ajustes import SettingsService
+from application.consultas_tareas import TaskQueries
+from domain.modelos import Course, Task, TaskBucket
+from domain.tiempo import now_ts
+from infrastructure.persistence import SQLiteTaskRepository
 
 
 class SettingsAndQueriesTests(unittest.TestCase):
@@ -20,20 +20,24 @@ class SettingsAndQueriesTests(unittest.TestCase):
         settings.set_sync_interval_seconds(3600)
         settings.set_notification_mode("resumen_diario")
         settings.set_ui_density("compacta")
+        settings.set_visual_mode("oscuro")
         settings.set_onboarding_completed(True)
 
         self.assertEqual(settings.sync_interval_seconds(), 3600)
         self.assertEqual(settings.notification_mode(), "resumen_diario")
         self.assertEqual(settings.ui_density(), "compacta")
+        self.assertEqual(settings.visual_mode(), "oscuro")
         self.assertTrue(settings.onboarding_completed())
 
         settings.set_sync_interval_seconds(123)
         settings.set_notification_mode("ruidoso")
         settings.set_ui_density("gigante")
+        settings.set_visual_mode("sepia")
 
         self.assertEqual(settings.sync_interval_seconds(), 21600)
         self.assertEqual(settings.notification_mode(), "solo_nuevos")
         self.assertEqual(settings.ui_density(), "comoda")
+        self.assertEqual(settings.visual_mode(), "claro")
         repo.close()
 
     def test_task_queries_filter_sort_and_count(self):

@@ -14,8 +14,19 @@ dependencies = [
   "winotify>=1.1; platform_system == 'Windows'",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "bandit[toml]>=1.7",
+  "pip-audit>=2.7",
+  "pytest>=8.0",
+]
+
+[tool.bandit]
+exclude_dirs = [".venv", "build", "dist"]
+skips = []
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-uph_pendientes = ["resources/icons/tabler/*.svg", "resources/brand/*.svg"]
+resources = ["icons/tabler/*.svg", "brand/*.svg"]

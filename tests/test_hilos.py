@@ -5,8 +5,8 @@ import threading
 import unittest
 from pathlib import Path
 
-from uph_pendientes.domain.modelos import Course
-from uph_pendientes.infrastructure.persistence import SQLiteTaskRepository
+from domain.modelos import Course
+from infrastructure.persistence import SQLiteTaskRepository
 
 
 class ThreadingTests(unittest.TestCase):

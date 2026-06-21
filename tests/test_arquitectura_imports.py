@@ -5,12 +5,12 @@ import pathlib
 import unittest
 
 
-FORBIDDEN = ("PySide6", "requests", "sqlite3", "keyring", "uph_pendientes.infrastructure", "uph_pendientes.presentation")
+FORBIDDEN = ("PySide6", "requests", "sqlite3", "keyring", "infrastructure", "presentation")
 
 
 class ArchitectureImportsTests(unittest.TestCase):
     def test_domain_and_application_keep_clean_imports(self):
-        root = pathlib.Path("src/uph_pendientes")
+        root = pathlib.Path("src")
         files = list((root / "domain").glob("*.py")) + list((root / "application").glob("*.py"))
         for path in files:
             tree = ast.parse(path.read_text(encoding="utf-8"))

@@ -27,37 +27,22 @@ pip install -e .
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-python -m uph_pendientes
+python src\main.py
 ```
 
+Tambien puedes abrir [src/main.py](C:/Users/User/Documents/PROYECTOS/ChivaTask/src/main.py) y ejecutarlo como archivo Python desde VS Code.
+
 La primera ejecucion pide usuario y contrasena del campus. No se guardan en archivos: se almacenan con `keyring`, que en Windows usa Credential Manager.
-
-## VS Code
-
-El proyecto incluye configuracion en `.vscode/` para usar el entorno local `.venv`.
-
-Atajos utiles:
-
-- Debug: selecciona `ChivaTask` en Run and Debug.
-- Tarea: `Terminal > Run Task > Run app`.
-- Tests: `Terminal > Run Task > Run tests`.
-- Build: `Terminal > Run Task > Build exe`.
 
 ## Pruebas
 
 ```powershell
-python -m unittest discover -s tests
+python -m unittest discover -s tests -t .
 ```
 
 ## Empaque
 
-Build base con PyInstaller:
-
-```powershell
-pyinstaller packaging\uph-pendientes.spec
-```
-
-Installer recomendado: Inno Setup usando `packaging\installer.iss` despues de generar el build de PyInstaller.
+No hay build configurado por ahora. No generar `.exe` salvo solicitud explicita.
 
 ## Seguridad
 
