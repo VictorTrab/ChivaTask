@@ -259,6 +259,10 @@ class SQLiteTaskRepository:
         row = self.conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
         return default if row is None else row["value"]
 
+    def delete_setting(self, key: str) -> None:
+        self.conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+        self._commit()
+
     def _task_from_row(self, row: sqlite3.Row) -> Task:
         return Task(
             assignment_id=int(row["assignment_id"]),

@@ -30,25 +30,31 @@ class SettingsAndQueriesTests(unittest.TestCase):
 
         settings.set_sync_interval_seconds(3600)
         settings.set_notification_mode("resumen_diario")
-        settings.set_ui_density("compacta")
         settings.set_visual_mode("oscuro")
         settings.set_onboarding_completed(True)
 
         self.assertEqual(settings.sync_interval_seconds(), 3600)
         self.assertEqual(settings.notification_mode(), "resumen_diario")
-        self.assertEqual(settings.ui_density(), "compacta")
         self.assertEqual(settings.visual_mode(), "oscuro")
         self.assertTrue(settings.onboarding_completed())
 
         settings.set_sync_interval_seconds(123)
         settings.set_notification_mode("ruidoso")
-        settings.set_ui_density("gigante")
         settings.set_visual_mode("sepia")
 
         self.assertEqual(settings.sync_interval_seconds(), 21600)
         self.assertEqual(settings.notification_mode(), "solo_nuevos")
-        self.assertEqual(settings.ui_density(), "comoda")
         self.assertEqual(settings.visual_mode(), "claro")
+        repo.close()
+
+    def test_settings_cleanup_removes_legacy_density_key(self):
+        repo = SQLiteTaskRepository(":memory:")
+        settings = SettingsService(repo, FakeAutostart())
+        repo.set_setting("ui_density", "compacta")
+
+        settings.cleanup_legacy_settings()
+
+        self.assertIsNone(repo.get_setting("ui_density"))
         repo.close()
 
     def test_settings_use_injected_autostart_manager(self):

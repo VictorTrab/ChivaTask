@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 from domain.modelos import Course, StoredCredentials, SyncResult, Task
 from infrastructure.persistence import SQLiteTaskRepository
 from infrastructure.security import WindowsCredentialRepository
+from presentation.qt.bandeja import TrayController
 from presentation.qt.componentes.prototipo import (
     CourseCard,
     MiniCalendar,
@@ -90,6 +91,30 @@ class FakeNavigator:
     def open_folder(self, path):
         self.folders.append(path)
         return True
+
+
+class FakeTray:
+    def __init__(self) -> None:
+        self.messages = 0
+        self.resets = 0
+        self.visible = True
+
+    def is_visible(self) -> bool:
+        return self.visible
+
+    def show_background_message(self) -> None:
+        self.messages += 1
+
+    def reset_background_message(self) -> None:
+        self.resets += 1
+
+
+class FakeSystemTray:
+    def __init__(self) -> None:
+        self.messages = 0
+
+    def showMessage(self, *_args) -> None:  # noqa: N802 - Qt API
+        self.messages += 1
 
 
 class PresentationSmokeTests(unittest.TestCase):
@@ -198,6 +223,43 @@ class PresentationSmokeTests(unittest.TestCase):
             window.close()
             repo.close()
 
+    def test_background_tray_message_is_shown_once_until_reset(self):
+        controller = object.__new__(TrayController)
+        controller._background_message_shown = False
+        controller.tray = FakeSystemTray()
+
+        controller.show_background_message()
+        controller.show_background_message()
+
+        self.assertEqual(controller.tray.messages, 1)
+
+        controller.reset_background_message()
+        controller.show_background_message()
+
+        self.assertEqual(controller.tray.messages, 2)
+
+    def test_show_normal_rearms_background_tray_message(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+            tray = FakeTray()
+            window.tray = tray  # type: ignore[assignment]
+
+            window.show_normal()
+
+            self.assertEqual(tray.resets, 1)
+            tray.visible = False
+            window.close()
+            repo.close()
+
     def test_onboarding_is_marked_complete_after_successful_sync(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
@@ -219,7 +281,7 @@ class PresentationSmokeTests(unittest.TestCase):
             window.close()
             repo.close()
 
-    def test_visual_preferences_apply_dark_compact_stylesheet(self):
+    def test_visual_preferences_apply_dark_stylesheet_and_remove_density(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
             repo.set_setting("visual_mode", "oscuro")
@@ -237,7 +299,55 @@ class PresentationSmokeTests(unittest.TestCase):
             stylesheet = window.styleSheet()
 
             self.assertIn("#101820", stylesheet)
-            self.assertIn("font-size: 12px", stylesheet)
+            self.assertNotIn("font-size: 19px", stylesheet)
+            self.assertIsNone(repo.get_setting("ui_density"))
+            window.close()
+            repo.close()
+
+    def test_theme_toggle_switches_mode_and_syncs_buttons(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            self.assertEqual(window.settings.visual_mode(), "claro")
+            window.header_theme_toggle.click()
+
+            self.assertEqual(window.settings.visual_mode(), "oscuro")
+            self.assertEqual(window.header_theme_toggle.visual_mode, "oscuro")
+            self.assertEqual(window.appearance_theme_toggle.visual_mode, "oscuro")
+
+            window.appearance_theme_toggle.click()
+
+            self.assertEqual(window.settings.visual_mode(), "claro")
+            self.assertEqual(window.header_theme_toggle.visual_mode, "claro")
+            window.close()
+            repo.close()
+
+    def test_appearance_settings_no_longer_show_density_row(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            labels = [label.text() for label in window.findChildren(type(window.title_label))]
+
+            self.assertNotIn("Densidad de informacion", labels)
+            self.assertIn("Modo oscuro", labels)
             window.close()
             repo.close()
 

@@ -305,7 +305,40 @@ class ToggleSwitch(QPushButton):
 
     def _refresh(self) -> None:
         self.setObjectName("toggleOn" if self._checked else "toggleOff")
-        self.setText("ON" if self._checked else "OFF")
+        self.setText("")
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+
+class ThemeToggleButton(QPushButton):
+    changed = Signal(str)
+
+    def __init__(self, icon_light: QIcon, icon_dark: QIcon, visual_mode: str = "claro") -> None:
+        super().__init__()
+        self.icon_light = icon_light
+        self.icon_dark = icon_dark
+        self.visual_mode = "oscuro" if visual_mode == "oscuro" else "claro"
+        self.setCheckable(True)
+        self.setFixedSize(44, 36)
+        self.setAccessibleName("Cambiar modo claro u oscuro")
+        self.clicked.connect(self._toggle)
+        self._refresh()
+
+    def set_visual_mode(self, visual_mode: str) -> None:
+        self.visual_mode = "oscuro" if visual_mode == "oscuro" else "claro"
+        self._refresh()
+
+    def _toggle(self) -> None:
+        self.visual_mode = "claro" if self.visual_mode == "oscuro" else "oscuro"
+        self._refresh()
+        self.changed.emit(self.visual_mode)
+
+    def _refresh(self) -> None:
+        dark = self.visual_mode == "oscuro"
+        self.setChecked(dark)
+        self.setIcon(self.icon_dark if dark else self.icon_light)
+        self.setObjectName("themeToggleDark" if dark else "themeToggleLight")
+        self.setToolTip("Cambiar a modo claro" if dark else "Cambiar a modo oscuro")
         self.style().unpolish(self)
         self.style().polish(self)
 

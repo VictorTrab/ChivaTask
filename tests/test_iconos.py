@@ -17,6 +17,8 @@ class IconRegistryTests(unittest.TestCase):
 
     def test_declared_tabler_icons_load(self):
         registry = IconRegistry()
+        self.assertIn("moon", registry.ICONS)
+        self.assertIn("sun", registry.ICONS)
         for name in registry.ICONS:
             with self.subTest(name=name):
                 self.assertFalse(registry.icon(name).isNull())

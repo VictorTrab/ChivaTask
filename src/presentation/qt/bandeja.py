@@ -13,6 +13,7 @@ from .registro_iconos import IconRegistry
 
 class TrayController:
     def __init__(self, parent: QWidget, icons: IconRegistry, show_window, sync_now) -> None:
+        self._background_message_shown = False
         self.tray = QSystemTrayIcon(parent)
         self.tray.setIcon(logo_icon())
         menu = QMenu()
@@ -34,4 +35,10 @@ class TrayController:
         return self.tray.isVisible()
 
     def show_background_message(self) -> None:
+        if self._background_message_shown:
+            return
+        self._background_message_shown = True
         self.tray.showMessage(APP_NAME, "La app sigue en segundo plano.", QSystemTrayIcon.Information, 2500)
+
+    def reset_background_message(self) -> None:
+        self._background_message_shown = False

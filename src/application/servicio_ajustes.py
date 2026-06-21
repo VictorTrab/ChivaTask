@@ -8,8 +8,7 @@ from shared.ajustes import DEFAULT_SYNC_INTERVAL_SECONDS
 
 ALLOWED_SYNC_INTERVALS = {3600, 21600, 86400}
 ALLOWED_NOTIFICATION_MODES = {"solo_nuevos", "resumen_diario", "silencioso"}
-ALLOWED_DENSITIES = {"comoda", "compacta"}
-ALLOWED_VISUAL_MODES = {"claro", "oscuro", "sistema"}
+ALLOWED_VISUAL_MODES = {"claro", "oscuro"}
 
 
 class SettingsService:
@@ -42,16 +41,15 @@ class SettingsService:
     def set_setting_bool(self, key: str, enabled: bool) -> None:
         self.repository.set_setting(key, enabled)
 
-    def ui_density(self) -> str:
-        value = self.repository.get_setting("ui_density", "comoda") or "comoda"
-        return value if value in ALLOWED_DENSITIES else "comoda"
-
-    def set_ui_density(self, density: str) -> None:
-        self.repository.set_setting("ui_density", density if density in ALLOWED_DENSITIES else "comoda")
+    def cleanup_legacy_settings(self) -> None:
+        self.repository.delete_setting("ui_density")
 
     def visual_mode(self) -> str:
         value = self.repository.get_setting("visual_mode", "claro") or "claro"
-        return value if value in ALLOWED_VISUAL_MODES else "claro"
+        if value in ALLOWED_VISUAL_MODES:
+            return value
+        self.repository.set_setting("visual_mode", "claro")
+        return "claro"
 
     def set_visual_mode(self, mode: str) -> None:
         self.repository.set_setting("visual_mode", mode if mode in ALLOWED_VISUAL_MODES else "claro")

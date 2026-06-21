@@ -49,6 +49,10 @@ QMainWindow, QWidget {
     background: rgba(255,255,255,0.08);
     color: white;
 }
+#navItem:focus, #navHint:focus, #primaryButton:focus, #secondaryButton:focus,
+#dangerButton:focus, #iconButton:focus, #themeToggleLight:focus, #themeToggleDark:focus {
+    border: 1px solid #6EE7B7;
+}
 #navItemActive {
     background: #16775F;
     color: white;
@@ -311,7 +315,7 @@ QTreeWidget::item:selected, QListWidget::item:selected {
 #toggleOn, #toggleOff {
     border: none;
     border-radius: 14px;
-    font-size: 9px;
+    font-size: 12px;
     font-weight: 900;
 }
 #toggleOn {
@@ -323,6 +327,25 @@ QTreeWidget::item:selected, QListWidget::item:selected {
     background: #CBD5E1;
     color: #FFFFFF;
     text-align: left;
+}
+#themeToggleLight, #themeToggleDark {
+    border-radius: 18px;
+    padding: 6px;
+    font-weight: 800;
+}
+#themeToggleLight {
+    background: #FFFFFF;
+    border: 1px solid #D8E2EA;
+}
+#themeToggleLight:hover {
+    background: #E8F5F0;
+}
+#themeToggleDark {
+    background: #123F35;
+    border: 1px solid #16775F;
+}
+#themeToggleDark:hover {
+    background: #0F5F4A;
 }
 #pillFilter {
     background: transparent;
@@ -442,6 +465,11 @@ QHeaderView::section {
 #primaryButton:hover {
     background: #0F5F4A;
 }
+#primaryButton:disabled, #secondaryButton:disabled, #dangerButton:disabled {
+    background: #E2E8F0;
+    color: #94A3B8;
+    border: 1px solid #CBD5E1;
+}
 #dangerPrimaryButton {
     background: #DC2626;
 }
@@ -484,6 +512,9 @@ QHeaderView::section {
 }
 #iconButton:hover {
     background: #E9F7F1;
+}
+#iconButton {
+    padding: 6px;
 }
 QLineEdit, QComboBox {
     background: white;
@@ -600,6 +631,17 @@ QLineEdit, QComboBox, #baseModal {
     background: #16775F;
     color: #FFFFFF;
 }
+#themeToggleLight {
+    background: #182331;
+    border-color: #2B3A4A;
+}
+#themeToggleLight:hover, #themeToggleDark:hover {
+    background: #203044;
+}
+#themeToggleDark {
+    background: #16775F;
+    border-color: #3FD6A5;
+}
 #errorBanner {
     background: #3A1820;
     border-color: #7F1D1D;
@@ -610,33 +652,8 @@ QLineEdit, QComboBox, #baseModal {
 }
 """
 
-COMPACT_OVERRIDES = """
-QMainWindow, QWidget {
-    font-size: 12px;
-}
-#navItem, #navHint, #navItemActive {
-    padding: 8px 10px;
-}
-#primaryButton, #dangerPrimaryButton, #secondaryButton, #dangerButton,
-QLineEdit, QComboBox {
-    padding: 7px 10px;
-}
-#settingsRow {
-    padding: 8px;
-}
-#metricValue, #statValue, #progressRingValue {
-    font-size: 21px;
-}
-#heroTitle {
-    font-size: 19px;
-}
-"""
-
-
-def app_stylesheet(visual_mode: str = "claro", density: str = "comoda") -> str:
+def app_stylesheet(visual_mode: str = "claro") -> str:
     stylesheet = STYLESHEET
     if visual_mode == "oscuro":
         stylesheet += DARK_OVERRIDES
-    if density == "compacta":
-        stylesheet += COMPACT_OVERRIDES
     return stylesheet

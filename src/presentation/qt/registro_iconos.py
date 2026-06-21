@@ -26,6 +26,8 @@ class IconRegistry:
         "user_switch": "user-switch.svg",
         "logout": "logout.svg",
         "sparkles": "sparkles.svg",
+        "moon": "moon.svg",
+        "sun": "sun.svg",
     }
 
     def __init__(self) -> None:

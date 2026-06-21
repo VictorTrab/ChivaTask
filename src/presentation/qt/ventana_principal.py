@@ -57,9 +57,9 @@ from .componentes.prototipo import (
     MetricCard,
     MiniCalendar,
     ProgressRing,
-    SegmentedControl,
     SettingsRow,
     TaskRowCard,
+    ThemeToggleButton,
     ToggleSwitch,
     PillFilter,
     relative_due_text,
@@ -95,8 +95,10 @@ class MainWindow(QMainWindow):
         self.autostart = autostart
         self.run_sync = run_sync
         self.settings = SettingsService(repository, autostart)
+        self.settings.cleanup_legacy_settings()
         self.queries = TaskQueries(repository)
         self.icons = IconRegistry()
+        self.theme_toggles: list[ThemeToggleButton] = []
         self.tasks: list[Task] = []
         self.filtered_tasks: list[Task] = []
         self.selected_task: Task | None = None
@@ -209,9 +211,11 @@ class MainWindow(QMainWindow):
         self.status_pill.setMaximumWidth(240)
         self.status_pill.setMinimumHeight(36)
         self.status_pill.setAlignment(Qt.AlignCenter)
+        self.header_theme_toggle = self._new_theme_toggle()
         self.profile_button = ProfileButton(self.icons, self.credentials, self.change_profile, self.logout_local)
         header.addLayout(title_box)
         header.addStretch(1)
+        header.addWidget(self.header_theme_toggle)
         header.addWidget(self.status_pill)
         header.addWidget(self.profile_button)
         return header
@@ -557,14 +561,10 @@ class MainWindow(QMainWindow):
 
     def _settings_appearance_page(self) -> QWidget:
         page = self._settings_page("Apariencia", "Personaliza el aspecto visual de ChivaTask")
-        visual = SegmentedControl([("Claro", "claro"), ("Oscuro", "oscuro"), ("Sistema", "sistema")], self.settings.visual_mode())
-        visual.changed.connect(self._set_visual_mode)
-        density = SegmentedControl([("Comoda", "comoda"), ("Compacta", "compacta")], self.settings.ui_density())
-        density.changed.connect(self._set_ui_density)
+        self.appearance_theme_toggle = self._new_theme_toggle()
         animations = ToggleSwitch(self.settings.setting_bool("animations_enabled", True))
         animations.toggled_value.connect(self._set_animations_enabled)
-        page.layout().addWidget(SettingsRow("Modo visual", "Tema de colores de la interfaz", visual))
-        page.layout().addWidget(SettingsRow("Densidad de informacion", "Tamano del espaciado en toda la interfaz", density))
+        page.layout().addWidget(SettingsRow("Modo oscuro", "Alterna entre tema claro y oscuro", self.appearance_theme_toggle))
         page.layout().addWidget(SettingsRow("Animaciones sutiles", "Transiciones y efectos de entrada y salida", animations))
         return page
 
@@ -743,27 +743,29 @@ class MainWindow(QMainWindow):
         self.course_search_timer.start()
 
     def _effective_visual_mode(self) -> str:
-        mode = self.settings.visual_mode()
-        if mode == "sistema":
-            return "claro"
-        return mode
+        return self.settings.visual_mode()
 
     def _apply_visual_preferences(self) -> None:
         set_animations_enabled(self.settings.setting_bool("animations_enabled", True))
-        self.setStyleSheet(app_stylesheet(self._effective_visual_mode(), self.settings.ui_density()))
+        mode = self._effective_visual_mode()
+        self.setStyleSheet(app_stylesheet(mode))
+        for toggle in getattr(self, "theme_toggles", []):
+            toggle.set_visual_mode(mode)
         self._apply_responsive_layout()
 
     def _set_visual_mode(self, mode: str) -> None:
         self.settings.set_visual_mode(mode)
         self._apply_visual_preferences()
 
-    def _set_ui_density(self, density: str) -> None:
-        self.settings.set_ui_density(density)
-        self._apply_visual_preferences()
-
     def _set_animations_enabled(self, enabled: bool) -> None:
         self.settings.set_setting_bool("animations_enabled", enabled)
         set_animations_enabled(enabled)
+
+    def _new_theme_toggle(self) -> ThemeToggleButton:
+        toggle = ThemeToggleButton(self.icons.icon("moon"), self.icons.icon("sun"), self._effective_visual_mode())
+        toggle.changed.connect(self._set_visual_mode)
+        self.theme_toggles.append(toggle)
+        return toggle
 
     def _apply_responsive_layout(self) -> None:
         compact = self.width() < 1180
@@ -1179,6 +1181,7 @@ class MainWindow(QMainWindow):
                 return
 
     def show_normal(self) -> None:
+        self.tray.reset_background_message()
         self.show()
         self.raise_()
         self.activateWindow()
