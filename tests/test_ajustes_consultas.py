@@ -5,17 +5,28 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
-from ajustes import SettingsService
 from application.consultas_tareas import TaskQueries
+from application.servicio_ajustes import SettingsService
 from domain.modelos import Course, Task, TaskBucket
 from domain.tiempo import now_ts
 from infrastructure.persistence import SQLiteTaskRepository
 
 
+class FakeAutostart:
+    def __init__(self) -> None:
+        self.value = False
+
+    def enabled(self) -> bool:
+        return self.value
+
+    def set_enabled(self, enabled: bool) -> None:
+        self.value = enabled
+
+
 class SettingsAndQueriesTests(unittest.TestCase):
     def test_settings_validate_supported_values(self):
         repo = SQLiteTaskRepository(":memory:")
-        settings = SettingsService(repo)
+        settings = SettingsService(repo, FakeAutostart())
 
         settings.set_sync_interval_seconds(3600)
         settings.set_notification_mode("resumen_diario")
@@ -38,6 +49,16 @@ class SettingsAndQueriesTests(unittest.TestCase):
         self.assertEqual(settings.notification_mode(), "solo_nuevos")
         self.assertEqual(settings.ui_density(), "comoda")
         self.assertEqual(settings.visual_mode(), "claro")
+        repo.close()
+
+    def test_settings_use_injected_autostart_manager(self):
+        repo = SQLiteTaskRepository(":memory:")
+        autostart = FakeAutostart()
+        settings = SettingsService(repo, autostart)
+
+        self.assertFalse(settings.autostart_enabled())
+        settings.set_autostart(True)
+        self.assertTrue(settings.autostart_enabled())
         repo.close()
 
     def test_task_queries_filter_sort_and_count(self):

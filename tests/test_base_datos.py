@@ -9,7 +9,7 @@ from domain.modelos import Course, Task
 from infrastructure.persistence import SQLiteTaskRepository
 
 
-class CacheDBTests(unittest.TestCase):
+class SQLiteTaskRepositoryTests(unittest.TestCase):
     def test_cache_stores_minimum_task_data_without_secret_columns(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = SQLiteTaskRepository(Path(tmp) / "cache.db")

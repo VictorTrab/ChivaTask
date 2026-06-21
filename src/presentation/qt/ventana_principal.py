@@ -31,7 +31,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ajustes import SettingsService
 from application.consultas_tareas import TaskQueries
 from application.puertos import (
     AutostartManager,
@@ -40,6 +39,7 @@ from application.puertos import (
     DesktopNotifier,
     TaskRepository,
 )
+from application.servicio_ajustes import SettingsService
 from domain.modelos import SyncResult, Task, TaskBucket
 from domain.politica_tareas import classify_task
 from domain.tiempo import now_ts, unix_to_local_text
@@ -94,7 +94,7 @@ class MainWindow(QMainWindow):
         self.navigator = navigator
         self.autostart = autostart
         self.run_sync = run_sync
-        self.settings = SettingsService(repository)
+        self.settings = SettingsService(repository, autostart)
         self.queries = TaskQueries(repository)
         self.icons = IconRegistry()
         self.tasks: list[Task] = []
