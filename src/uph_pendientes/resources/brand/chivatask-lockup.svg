@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="72" viewBox="0 0 256 72" fill="none">
+  <rect x="8" y="8" width="56" height="56" rx="14" fill="#123F35"/>
+  <path d="M20 28L36 20L52 28L36 36L20 28Z" fill="#F8FAFC"/>
+  <path d="M27 34V40C27 45 31 49 36 49C41 49 45 45 45 40V34" stroke="#F8FAFC" stroke-width="4" stroke-linecap="round"/>
+  <path d="M29 49H43" stroke="#F8FAFC" stroke-width="4" stroke-linecap="round"/>
+  <path d="M31 51C31 48 33 45 36 45C39 45 41 48 41 51V54H31V51Z" fill="#16775F"/>
+  <circle cx="36" cy="56" r="3" fill="#D97706"/>
+  <path d="M48 30V40" stroke="#D97706" stroke-width="4" stroke-linecap="round"/>
+  <path d="M30 40L35 45L44 36" stroke="#D1FAE5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="78" y="34" fill="#102033" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="800">ChivaTask</text>
+  <text x="78" y="54" fill="#64748B" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600">Gestor de pendientes academicos</text>
+</svg>

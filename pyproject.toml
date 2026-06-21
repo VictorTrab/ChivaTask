@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uph-pendientes"
+version = "0.1.0"
+description = "App local Windows para pendientes Moodle UPH"
+requires-python = ">=3.11"
+dependencies = [
+  "PySide6>=6.7",
+  "requests>=2.32",
+  "keyring>=25.0",
+  "winotify>=1.1; platform_system == 'Windows'",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+uph_pendientes = ["resources/icons/tabler/*.svg", "resources/brand/*.svg"]

@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: uph-pendientes
+Version: 0.1.0
+Summary: App local Windows para pendientes Moodle UPH
+Requires-Python: >=3.11
+Requires-Dist: PySide6>=6.7
+Requires-Dist: requests>=2.32
+Requires-Dist: keyring>=25.0
+Requires-Dist: winotify>=1.1; platform_system == "Windows"
