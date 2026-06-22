@@ -1,0 +1,4 @@
+interface:
+  display_name: "ChivaTask Design System"
+  short_description: "Tokens y reglas visuales Qt"
+  default_prompt: "Usa $chivatask-design-system para definir tokens y componentes visuales de ChivaTask."

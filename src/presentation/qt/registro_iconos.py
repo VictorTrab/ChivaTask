@@ -28,6 +28,10 @@ class IconRegistry:
         "sparkles": "sparkles.svg",
         "moon": "moon.svg",
         "sun": "sun.svg",
+        "search": "search.svg",
+        "shield": "shield.svg",
+        "database": "database.svg",
+        "info": "info-circle.svg",
     }
 
     def __init__(self) -> None:

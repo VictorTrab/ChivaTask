@@ -1,0 +1,4 @@
+interface:
+  display_name: "ChivaTask UI Audit"
+  short_description: "Audita pantallas, estados y UX visual"
+  default_prompt: "Usa $chivatask-modern-ui-audit para auditar la UI actual de ChivaTask con hallazgos P0/P1/P2."

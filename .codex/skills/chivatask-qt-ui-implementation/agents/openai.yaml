@@ -1,0 +1,4 @@
+interface:
+  display_name: "ChivaTask Qt UI"
+  short_description: "Implementacion UI PySide6 sin deuda"
+  default_prompt: "Usa $chivatask-qt-ui-implementation para implementar una mejora UI en PySide6."

@@ -44,3 +44,22 @@ class DetailPanel(QFrame):
         self.layout.setSpacing(12)
         self.layout.setAlignment(Qt.AlignTop)
 
+
+class InfoCard(QFrame):
+    def __init__(self, label: str, value: str, variant: str = "default") -> None:
+        super().__init__()
+        self.setObjectName(f"infoCard-{variant}")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(4)
+        self.label_label = QLabel(label)
+        self.label_label.setObjectName("infoCardLabel")
+        self.value_label = QLabel(value)
+        self.value_label.setObjectName("infoCardValue")
+        self.value_label.setWordWrap(True)
+        layout.addWidget(self.label_label)
+        layout.addWidget(self.value_label)
+
+    def update_value(self, label: str, value: str) -> None:
+        self.label_label.setText(label)
+        self.value_label.setText(value)

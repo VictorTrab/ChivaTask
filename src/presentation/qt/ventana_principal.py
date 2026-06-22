@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from PySide6.QtCore import QThread, QTimer, Qt, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QFont, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QCloseEvent, QFont
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QFrame,
@@ -14,7 +15,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -51,6 +51,7 @@ from .componentes.botones import PrimaryButton, SecondaryButton
 from .componentes.chips import StatusChip
 from .componentes.modales import BaseModal, ConfirmModal
 from .componentes.perfil import ProfileButton
+from .componentes.shell import NavItem, SearchField, SyncStatusPill
 from .componentes.prototipo import (
     CourseCard,
     EmptyState,
@@ -64,9 +65,8 @@ from .componentes.prototipo import (
     PillFilter,
     relative_due_text,
 )
-from .componentes.tarjetas import DetailPanel, StatCard
+from .componentes.tarjetas import DetailPanel, InfoCard, StatCard
 from .dialogo_login import LoginDialog
-from .dialogo_onboarding import OnboardingDialog
 from .animaciones import set_animations_enabled
 from .estilos import app_stylesheet
 from .logo import BrandLockup, logo_icon
@@ -109,7 +109,6 @@ class MainWindow(QMainWindow):
         self.syncing = False
         self.api_status = "pending"
         self.last_error_code: str | None = None
-        self.awaiting_onboarding_sync = False
         self.task_search_timer = QTimer(self)
         self.task_search_timer.setSingleShot(True)
         self.task_search_timer.setInterval(250)
@@ -131,11 +130,11 @@ class MainWindow(QMainWindow):
         self.timer.setInterval(sync_interval_seconds * 1000)
         self.timer.timeout.connect(self.sync_now)
         self.timer.start()
-        self.command_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
-        self.command_shortcut.activated.connect(self.open_command_palette)
-
+        self.startup_timer = QTimer(self)
+        self.startup_timer.setSingleShot(True)
+        self.startup_timer.timeout.connect(self.ensure_startup_sync)
+        self.startup_timer.start(300)
         self.refresh_from_cache()
-        QTimer.singleShot(300, self.ensure_login_and_sync)
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -152,23 +151,17 @@ class MainWindow(QMainWindow):
         sidebar_layout.setSpacing(8)
         sidebar_layout.addWidget(BrandLockup(compact=True))
 
-        self.nav_buttons: dict[str, QPushButton] = {}
+        self.nav_buttons: dict[str, NavItem] = {}
         for key, icon, text in (
             ("inicio", "home", "Inicio"),
             ("tareas", "tasks", "Tareas"),
             ("cursos", "courses", "Cursos"),
             ("ajustes", "settings", "Ajustes"),
         ):
-            button = QPushButton(self.icons.icon(icon), text)
-            button.setObjectName("navItem")
-            button.setFlat(True)
-            button.clicked.connect(lambda _=False, nav_key=key: self.navigate(nav_key))
+            button = NavItem(self.icons.icon(icon), text)
+            button.clicked.connect(lambda nav_key=key: self.navigate(nav_key))
             sidebar_layout.addWidget(button)
             self.nav_buttons[key] = button
-        self.command_hint = QPushButton(self.icons.icon("tasks"), "Buscar...   Ctrl+K")
-        self.command_hint.setObjectName("navHint")
-        self.command_hint.clicked.connect(self.open_command_palette)
-        sidebar_layout.addWidget(self.command_hint)
         sidebar_layout.addStretch(1)
         self.version_label = QLabel("v1.0.0 - IIP-2026")
         self.version_label.setObjectName("sidebarMuted")
@@ -209,11 +202,7 @@ class MainWindow(QMainWindow):
         self.subtitle_label.setObjectName("subtitle")
         title_box.addWidget(self.title_label)
         title_box.addWidget(self.subtitle_label)
-        self.status_pill = QLabel("Sin sincronizar")
-        self.status_pill.setObjectName("statusPending")
-        self.status_pill.setMaximumWidth(240)
-        self.status_pill.setMinimumHeight(36)
-        self.status_pill.setAlignment(Qt.AlignCenter)
+        self.status_pill = SyncStatusPill(self.icons.icon("check"))
         self.header_theme_toggle = self._new_theme_toggle()
         self.profile_button = ProfileButton(self.icons, self.credentials, self.change_profile, self.logout_local)
         header.addLayout(title_box)
@@ -345,8 +334,7 @@ class MainWindow(QMainWindow):
             ("Pospuestas", "pospuestas"),
         ], "todas")
         self.task_filter.changed.connect(lambda _value: self.refresh_task_list())
-        self.task_search = QLineEdit()
-        self.task_search.setPlaceholderText("Buscar tarea o curso...")
+        self.task_search = SearchField(self.icons.icon("search"), "Buscar tarea o curso...")
         self.task_search.setAccessibleName("Buscar tareas")
         self.task_search.textChanged.connect(self._schedule_task_search_refresh)
         self.task_sort = QComboBox()
@@ -411,8 +399,7 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         course_filters = QHBoxLayout()
-        self.course_search = QLineEdit()
-        self.course_search.setPlaceholderText("Buscar curso...")
+        self.course_search = SearchField(self.icons.icon("search"), "Buscar curso...")
         self.course_search.setAccessibleName("Buscar cursos")
         self.course_search.textChanged.connect(self._schedule_course_search_refresh)
         self.course_filter = QComboBox()
@@ -443,17 +430,23 @@ class MainWindow(QMainWindow):
         self.course_detail.setFixedWidth(320)
         self.course_detail_title = QLabel("Selecciona un curso")
         self.course_detail_title.setObjectName("detailTitle")
-        self.course_detail_info = QLabel("")
-        self.course_detail_info.setWordWrap(True)
-        self.course_tasks_label = QLabel("")
+        self.course_fullname_label = QLabel("")
+        self.course_fullname_label.setObjectName("muted")
+        self.course_fullname_label.setWordWrap(True)
+        self.course_pending_card = InfoCard("Pendientes", "-")
+        self.course_progress_card = InfoCard("Progreso", "-")
+        self.course_preview_card = InfoCard("Próximas tareas", "-")
+        self.course_tasks_label = self.course_preview_card.value_label
         self.course_tasks_label.setWordWrap(True)
         open_course = PrimaryButton("Abrir Moodle", self.icons.icon("external"))
         open_course.clicked.connect(lambda _checked=False: self.navigator.open_campus_home())
         view_tasks = SecondaryButton("Ver tareas del curso", self.icons.icon("tasks"))
         view_tasks.clicked.connect(self._show_selected_course_tasks)
         self.course_detail.layout.addWidget(self.course_detail_title)
-        self.course_detail.layout.addWidget(self.course_detail_info)
-        self.course_detail.layout.addWidget(self.course_tasks_label)
+        self.course_detail.layout.addWidget(self.course_fullname_label)
+        self.course_detail.layout.addWidget(self.course_pending_card)
+        self.course_detail.layout.addWidget(self.course_progress_card)
+        self.course_detail.layout.addWidget(self.course_preview_card)
         self.course_detail.layout.addWidget(open_course)
         self.course_detail.layout.addWidget(view_tasks)
         self.course_detail.layout.addStretch(1)
@@ -472,15 +465,15 @@ class MainWindow(QMainWindow):
         nav.setFixedWidth(210)
         nav.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.settings_stack = QStackedWidget()
-        for title, page in (
-            ("Perfil y Campus", self._settings_profile_page()),
-            ("Sincronización", self._settings_sync_page()),
-            ("Notificaciones", self._settings_notifications_page()),
-            ("Privacidad y Datos", self._settings_privacy_page()),
-            ("Apariencia", self._settings_appearance_page()),
-            ("Acerca de", self._settings_about_page()),
+        for icon, title, page in (
+            ("user", "Perfil y Campus", self._settings_profile_page()),
+            ("refresh", "Sincronización", self._settings_sync_page()),
+            ("bell", "Notificaciones", self._settings_notifications_page()),
+            ("shield", "Privacidad y Datos", self._settings_privacy_page()),
+            ("moon", "Apariencia", self._settings_appearance_page()),
+            ("info", "Acerca de", self._settings_about_page()),
         ):
-            nav.addItem(title)
+            nav.addItem(QListWidgetItem(self.icons.icon(icon), title))
             self.settings_stack.addWidget(page)
         nav.currentRowChanged.connect(self.settings_stack.setCurrentIndex)
         nav.setCurrentRow(0)
@@ -490,8 +483,7 @@ class MainWindow(QMainWindow):
 
     def _settings_profile_page(self) -> QWidget:
         page = self._settings_page("Perfil y Campus", "Cuenta conectada a Campus Moodle")
-        self.profile_summary = QLabel("")
-        self.profile_summary.setObjectName("settingsCard")
+        self.profile_summary = self._settings_profile_card()
         change = PrimaryButton("Cambiar perfil", self.icons.icon("user_switch"))
         change.setMaximumWidth(180)
         change.clicked.connect(self.change_profile)
@@ -511,7 +503,7 @@ class MainWindow(QMainWindow):
         self.start_windows_check = ToggleSwitch(self.autostart.enabled())
         self.start_windows_check.toggled_value.connect(self._set_autostart_from_settings)
         self.interval_combo = QComboBox()
-        for text, value in (("Cada 1 hora", 3600), ("Cada 6 horas", 21600), ("Una vez al dia", 86400)):
+        for text, value in (("Cada 1 hora", 3600), ("Cada 6 horas", 21600), ("Una vez al día", 86400)):
             self.interval_combo.addItem(text, value)
         self._select_combo_value(self.interval_combo, self.settings.sync_interval_seconds())
         self.interval_combo.currentIndexChanged.connect(self._interval_changed)
@@ -548,9 +540,14 @@ class MainWindow(QMainWindow):
 
     def _settings_privacy_page(self) -> QWidget:
         page = self._settings_page("Privacidad y Datos Locales", "ChivaTask guarda todo en este equipo")
-        data = QLabel(f"Credenciales: Windows Credential Manager\nCaché local: SQLite\nRuta: {self.repository.path}\nDatos externos: nada sale de este equipo")
-        data.setObjectName("settingsCard")
-        data.setWordWrap(True)
+        data = self._settings_info_list(
+            (
+                ("shield", "Credenciales", "Windows Credential Manager"),
+                ("database", "Caché local", "SQLite local"),
+                ("shield", "Datos externos", "Nada sale de este equipo"),
+                ("database", "Ruta de caché", str(self.repository.path)),
+            )
+        )
         open_folder = SecondaryButton("Abrir carpeta de datos")
         open_folder.clicked.connect(self.open_data_folder)
         clear = SecondaryButton("Limpiar caché local")
@@ -572,15 +569,42 @@ class MainWindow(QMainWindow):
 
     def _settings_about_page(self) -> QWidget:
         page = self._settings_page("Acerca de", "Tu campus académico, sin excusas.")
+        hero = QFrame()
+        hero.setObjectName("aboutHero")
+        hero_layout = QVBoxLayout(hero)
+        hero_layout.setContentsMargins(24, 24, 24, 24)
+        hero_layout.setSpacing(10)
+        hero_layout.setAlignment(Qt.AlignCenter)
+        hero_layout.addWidget(BrandLockup(compact=False, header=False), 0, Qt.AlignCenter)
+        tagline = QLabel("Tu campus académico, sin excusas.")
+        tagline.setObjectName("aboutHeroSubtitle")
+        tagline.setAlignment(Qt.AlignCenter)
+        badges = QLabel("v1.0.0   ·   IIP-2026")
+        badges.setObjectName("aboutHeroBadge")
+        badges.setAlignment(Qt.AlignCenter)
+        hero_layout.addWidget(tagline)
+        hero_layout.addWidget(badges)
+
         about = QLabel(
-            "ChivaTask es una aplicación local para gestionar pendientes académicos.\n\n"
-            "Stack real: Python 3.11+, PySide6 / Qt Widgets, Moodle REST API oficial, "
-            "SQLite local y Windows Credential Manager.\n\n"
-            "Herramienta personal no oficial. No tiene afiliacion ni respaldo institucional de UPH."
+            "ChivaTask es una aplicación de escritorio local para gestionar pendientes académicos. "
+            "Consulta la plataforma Moodle mediante su API oficial, detecta tareas sin entrega "
+            "registrada y notifica cambios importantes sin que el estudiante tenga que abrir el campus manualmente.\n\n"
+            "Esta es una herramienta de uso personal, no oficial. No tiene afiliación ni respaldo institucional."
         )
         about.setObjectName("settingsCard")
         about.setWordWrap(True)
+        tech = self._settings_info_list(
+            (
+                ("check", "Python 3.11+ y PySide6", "Interfaz de escritorio con Qt Widgets"),
+                ("external", "Moodle REST API oficial", "Fuente de datos académicos"),
+                ("database", "SQLite", "Caché local de tareas y cursos"),
+                ("shield", "Windows Credential Manager", "Almacenamiento seguro de credenciales"),
+            )
+        )
+        page.layout().addWidget(hero)
         page.layout().addWidget(about)
+        page.layout().addWidget(self._section_title("Tecnologías"))
+        page.layout().addWidget(tech)
         return page
 
     def _settings_page(self, title: str, subtitle: str) -> QWidget:
@@ -598,6 +622,62 @@ class MainWindow(QMainWindow):
         layout.addWidget(subtitle_label)
         layout.addSpacing(8)
         return page
+
+    def _settings_profile_card(self) -> QFrame:
+        card = QFrame()
+        card.setObjectName("profileSettingsCard")
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(16)
+        self.profile_settings_avatar = QLabel("HL")
+        self.profile_settings_avatar.setObjectName("profileSettingsAvatar")
+        self.profile_settings_avatar.setAlignment(Qt.AlignCenter)
+        self.profile_settings_avatar.setFixedSize(60, 60)
+        text_box = QVBoxLayout()
+        text_box.setSpacing(3)
+        self.profile_settings_name = QLabel("Sin perfil")
+        self.profile_settings_name.setObjectName("profileSettingsName")
+        self.profile_settings_username = QLabel("")
+        self.profile_settings_username.setObjectName("profileSettingsUsername")
+        self.profile_settings_status = QLabel("")
+        self.profile_settings_status.setObjectName("profileSettingsStatus")
+        text_box.addWidget(self.profile_settings_name)
+        text_box.addWidget(self.profile_settings_username)
+        text_box.addWidget(self.profile_settings_status)
+        layout.addWidget(self.profile_settings_avatar)
+        layout.addLayout(text_box, 1)
+        return card
+
+    def _settings_info_list(self, rows: tuple[tuple[str, str, str], ...]) -> QFrame:
+        card = QFrame()
+        card.setObjectName("settingsInfoList")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        for icon_name, label, value in rows:
+            row = QFrame()
+            row.setObjectName("settingsInfoRow")
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(16, 14, 16, 14)
+            row_layout.setSpacing(14)
+            icon = QLabel()
+            icon.setObjectName("settingsInfoIcon")
+            icon.setAlignment(Qt.AlignCenter)
+            icon.setPixmap(self.icons.icon(icon_name).pixmap(20, 20))
+            icon.setFixedSize(42, 42)
+            texts = QVBoxLayout()
+            texts.setSpacing(3)
+            label_widget = QLabel(label)
+            label_widget.setObjectName("settingsInfoLabel")
+            value_widget = QLabel(value)
+            value_widget.setObjectName("settingsInfoValue")
+            value_widget.setWordWrap(True)
+            texts.addWidget(label_widget)
+            texts.addWidget(value_widget)
+            row_layout.addWidget(icon)
+            row_layout.addLayout(texts, 1)
+            layout.addWidget(row)
+        return card
 
     def _section_title(self, text: str) -> QLabel:
         label = QLabel(text)
@@ -631,20 +711,10 @@ class MainWindow(QMainWindow):
         table.setSelectionBehavior(QTableWidget.SelectRows)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
 
-    def ensure_login_and_sync(self) -> None:
+    def ensure_startup_sync(self) -> None:
         if not self.credentials.has_credentials():
-            if self.settings.onboarding_completed():
-                accepted = self._exec_login_dialog()
-            else:
-                accepted = self._exec_onboarding_dialog()
-                if accepted:
-                    self.awaiting_onboarding_sync = True
-            if not accepted:
-                self._set_status("Credenciales pendientes", "pending")
-                return
-            if self.awaiting_onboarding_sync:
-                self.sync_now()
-                return
+            self._set_status("Credenciales pendientes", "pending")
+            return
         if self.settings.setting_bool("sync_on_start", True):
             self.sync_now()
 
@@ -673,15 +743,11 @@ class MainWindow(QMainWindow):
         if result.ok:
             self.api_status = "ok"
             self.last_error_code = None
-            if self.awaiting_onboarding_sync:
-                self.settings.set_onboarding_completed(True)
-                self.awaiting_onboarding_sync = False
             self.error_banner.hide()
             self._set_data_state("success")
             self._set_status("Sincronizado", "ok")
             self._notify_changed(result.changed_pending)
         else:
-            self.awaiting_onboarding_sync = False
             self.api_status = "error"
             self.last_error_code = result.error_code
             self.error_label.setText(f"Sin conexión a Moodle - Mostrando datos en caché ({result.error_code})")
@@ -689,7 +755,8 @@ class MainWindow(QMainWindow):
             self._set_data_state("offline-cache" if result.pending_count or result.course_count else "recoverable-error")
             self._set_status("Sin conexión", "error")
             if result.error_code == "invalidlogin":
-                self._exec_login_dialog()
+                if self._exec_login_dialog(hide_shell=True, restore_on_cancel=True):
+                    self.sync_now()
 
     def _notify_changed(self, tasks: list[Task]) -> None:
         if not tasks:
@@ -723,8 +790,8 @@ class MainWindow(QMainWindow):
         self.overdue_card.update_value(str(counts["vencidas"]), "Vencidas")
         self.week_card.update_value(str(len(self.queries.tasks_due_within(7))), "Esta semana")
         self.course_card.update_value(str(courses), "Cursos activos")
-        self.nav_buttons["tareas"].setText(f"Tareas   {counts['todas']}")
-        self.nav_buttons["cursos"].setText(f"Cursos   {courses}")
+        self.nav_buttons["tareas"].set_badge(counts["todas"])
+        self.nav_buttons["cursos"].set_badge(courses)
         last = self.queries.last_successful_sync()
         if last and self.api_status != "error":
             self._set_status("Sincronizado", "ok")
@@ -984,19 +1051,25 @@ class MainWindow(QMainWindow):
         course = self.selected_course
         if not course:
             self.course_detail_title.setText("Selecciona un curso")
-            self.course_detail_info.setText("")
-            self.course_tasks_label.setText("")
+            self.course_fullname_label.setText("")
+            self.course_pending_card.update_value("Pendientes", "-")
+            self.course_progress_card.update_value("Progreso", "-")
+            self.course_preview_card.update_value("Próximas tareas", "-")
             return
         total = int(course["total"])
         submitted = int(course["submitted"])
+        pending = int(course["pending"])
         progress = int((submitted / total) * 100) if total else 0
         self.course_detail_title.setText(str(course["shortname"]))
-        self.course_detail_info.setText(
-            f"{course['fullname']}\nPendientes: {course['pending']}\nEntregadas: {submitted} de {total}\nProgreso: {progress}%"
+        self.course_fullname_label.setText(str(course["fullname"]))
+        self.course_pending_card.update_value(
+            "Pendientes",
+            "Sin pendientes" if pending == 0 else f"{pending} pendiente{'s' if pending != 1 else ''}",
         )
+        self.course_progress_card.update_value("Progreso", f"{submitted} de {total} entregadas - {progress}%")
         tasks: list[Task] = course["tasks"]  # type: ignore[assignment]
         preview = "\n".join(f"- {task.name} ({STATUS_TEXT[classify_task(task)]})" for task in tasks[:5])
-        self.course_tasks_label.setText(preview or "Todo entregado. Sin pendientes.")
+        self.course_preview_card.update_value("Próximas tareas", preview or "Todo entregado. Sin pendientes.")
 
     def _show_selected_course_tasks(self) -> None:
         if not self.selected_course:
@@ -1020,13 +1093,8 @@ class MainWindow(QMainWindow):
         self.title_label.setText(titles[key][0])
         self.subtitle_label.setText(titles[key][1])
         for nav_key, button in self.nav_buttons.items():
-            button.setObjectName("navItemActive" if nav_key == key else "navItem")
-            button.style().unpolish(button)
-            button.style().polish(button)
+            button.set_active(nav_key == key)
         self.footer.setVisible(key in {"inicio", "tareas"})
-
-    def open_command_palette(self) -> None:
-        CommandPalette(self, self.tasks, self.navigate, self._select_task).exec()
 
     def open_selected(self) -> None:
         if self.selected_task and self.selected_task.url:
@@ -1050,18 +1118,23 @@ class MainWindow(QMainWindow):
         except CredentialError as exc:
             QMessageBox.critical(self, "Credential Manager", str(exc))
             return
-        if self._exec_login_dialog():
+        if self._exec_login_dialog(hide_shell=True, restore_on_cancel=True):
             self.sync_now()
 
-    def _exec_login_dialog(self) -> bool:
+    def _exec_login_dialog(self, hide_shell: bool = False, restore_on_cancel: bool = True) -> bool:
+        was_visible = self.isVisible()
+        if hide_shell:
+            self.hide()
         dialog = LoginDialog(self.credentials)
         dialog.setStyleSheet(self.styleSheet())
-        return dialog.exec() == QDialog.Accepted
-
-    def _exec_onboarding_dialog(self) -> bool:
-        dialog = OnboardingDialog(self.credentials)
-        dialog.setStyleSheet(self.styleSheet())
-        return dialog.exec() == QDialog.Accepted
+        accepted = dialog.exec() == QDialog.Accepted
+        if accepted:
+            self.settings.set_onboarding_completed(True)
+            if hide_shell:
+                self.show_normal()
+        elif hide_shell and restore_on_cancel and was_visible:
+            self.show_normal()
+        return accepted
 
     def logout_local(self) -> None:
         modal = ConfirmModal(
@@ -1088,8 +1161,11 @@ class MainWindow(QMainWindow):
             self.repository.clear_all_local_cache()
             self.settings.set_onboarding_completed(False)
             self.refresh_from_cache()
-            self._set_status("Sesion local cerrada", "pending")
-            QTimer.singleShot(100, self.ensure_login_and_sync)
+            self._set_status("Sesión local cerrada", "pending")
+            if self._exec_login_dialog(hide_shell=True, restore_on_cancel=False):
+                self.sync_now()
+            else:
+                QApplication.quit()
 
     def clear_cache_local(self) -> None:
         modal = ConfirmModal(
@@ -1118,17 +1194,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Carpeta no disponible", "No se pudo abrir la carpeta de datos local.")
 
     def _set_status(self, text: str, variant: str) -> None:
-        self.status_pill.setText(text)
-        self.status_pill.setObjectName(
-            {
-                "ok": "statusOk",
-                "error": "statusError",
-                "syncing": "statusSyncing",
-                "pending": "statusPending",
-            }[variant]
-        )
-        self.status_pill.style().unpolish(self.status_pill)
-        self.status_pill.style().polish(self.status_pill)
+        self.status_pill.set_status(text, variant)
 
     def _set_data_state(self, state: str) -> None:
         labels = {
@@ -1138,7 +1204,7 @@ class MainWindow(QMainWindow):
             "filtered-empty": "Sin resultados para el filtro",
             "offline-cache": "Sin conexión, usando caché",
             "recoverable-error": "Error recuperable de sincronización",
-            "blocking-error": "Accion bloqueada",
+            "blocking-error": "Acción bloqueada",
         }
         if hasattr(self, "data_state_label"):
             self.data_state_label.setText(labels.get(state, state))
@@ -1158,12 +1224,19 @@ class MainWindow(QMainWindow):
         return "Buenas noches"
 
     def _refresh_profile_summary(self) -> None:
-        if not hasattr(self, "profile_summary"):
+        if not hasattr(self, "profile_settings_name"):
             return
-        username = getattr(self.credentials, "get_username", lambda: None)() or "Sin perfil conectado"
-        self.profile_summary.setText(f"Usuario: {username}\nEstado: {'Conectado a Campus Moodle' if self.credentials.has_credentials() else 'Pendiente'}")
-        if hasattr(self.profile_button, "menu"):
-            self.profile_button.menu.refresh_user()
+        raw_username = getattr(self.credentials, "get_username", lambda: None)()
+        username = raw_username or "Sin perfil conectado"
+        display = username.split("@", 1)[0].replace(".", " ").strip().title() if raw_username else "Sin perfil"
+        initials = "".join(part[0] for part in display.split()[:2]).upper() if raw_username else "?"
+        self.profile_settings_avatar.setText(initials)
+        self.profile_settings_name.setText(display)
+        self.profile_settings_username.setText(username if raw_username else "Conecta una cuenta de Campus Moodle")
+        status = "Conectado a Campus Moodle" if self.credentials.has_credentials() else "Pendiente"
+        self.profile_settings_status.setText(f"• {status}")
+        if hasattr(self.profile_button, "refresh_user"):
+            self.profile_button.refresh_user()
 
     def _refresh_sync_history(self) -> None:
         if not hasattr(self, "sync_history"):
@@ -1205,58 +1278,20 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, self.refresh_course_list)
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        app = QApplication.instance()
+        if app and app.property("chivatask_testing"):
+            self.timer.stop()
+            self.startup_timer.stop()
+            self.task_search_timer.stop()
+            self.course_search_timer.stop()
+            super().closeEvent(event)
+            return
         if self.tray.is_visible():
             event.ignore()
             self.hide()
             self.tray.show_background_message()
         else:
             super().closeEvent(event)
-
-
-class CommandPalette(BaseModal):
-    def __init__(self, parent: MainWindow, tasks: list[Task], navigate, select_task) -> None:
-        super().__init__("Buscar en ChivaTask", parent)
-        self.tasks = tasks
-        self.navigate = navigate
-        self.select_task = select_task
-        self.search = QLineEdit()
-        self.search.setPlaceholderText("Buscar vista o tarea...")
-        self.results = QListWidget()
-        self.search_timer = QTimer(self)
-        self.search_timer.setSingleShot(True)
-        self.search_timer.setInterval(250)
-        self.search_timer.timeout.connect(self._refresh)
-        self.search.textChanged.connect(lambda _text: self.search_timer.start())
-        self.results.itemActivated.connect(self._activate)
-        self.layout.addWidget(self.search)
-        self.layout.addWidget(self.results)
-        self.setMinimumWidth(520)
-        self._refresh()
-
-    def _refresh(self) -> None:
-        self.results.clear()
-        query = self.search.text().strip().lower()
-        for key, label in (("inicio", "Ir a Inicio"), ("tareas", "Ir a Tareas"), ("cursos", "Ir a Cursos"), ("ajustes", "Ir a Ajustes")):
-            if not query or query in label.lower():
-                item = QListWidgetItem(label)
-                item.setData(Qt.UserRole, ("nav", key))
-                self.results.addItem(item)
-        for task in self.tasks:
-            label = f"{task.course_shortname} - {task.name}"
-            if not query or query in label.lower():
-                item = QListWidgetItem(label)
-                item.setData(Qt.UserRole, ("task", task.assignment_id))
-                self.results.addItem(item)
-
-    def _activate(self, item: QListWidgetItem) -> None:
-        kind, value = item.data(Qt.UserRole)
-        if kind == "nav":
-            self.navigate(value)
-        else:
-            task = next((candidate for candidate in self.tasks if candidate.assignment_id == value), None)
-            self.navigate("tareas")
-            self.select_task(task)
-        self.accept()
 
 
 STATUS_TEXT = {

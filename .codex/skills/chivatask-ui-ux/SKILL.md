@@ -4,6 +4,15 @@
 
 Mantener una interfaz PySide6 consistente, adaptable, accesible y adecuada para estudiantes.
 
+## Skills especializadas
+
+Para redisenos amplios, usar esta skill como base y derivar asi:
+
+- `chivatask-modern-ui-audit`: antes de planear o cambiar varias pantallas.
+- `chivatask-design-system`: al definir tokens, QSS, iconografia, claro/oscuro o identidad visual.
+- `chivatask-qt-ui-implementation`: al implementar componentes PySide6, layouts y accesibilidad.
+- `chivatask-visual-quality-gate`: antes de cerrar cualquier cambio UI/UX.
+
 ## Reglas visuales
 
 - Reutilizar componentes antes de crear variantes nuevas.

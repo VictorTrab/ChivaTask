@@ -52,6 +52,7 @@ Este proyecto usa una arquitectura modular. Preservala al agregar funcionalidade
 ## Reglas De Producto Y UI
 
 - Disenar para productividad academica: rapido de escanear, claro, denso y sin decoracion pesada.
+- Para redisenos amplios de UI, usar `interrogar` + `chivatask-modern-ui-audit` antes de planear; despues aplicar `chivatask-design-system`, `chivatask-qt-ui-implementation` y cerrar con `chivatask-visual-quality-gate`.
 - Usar el ciclo `scan -> diagnose -> fix`: capturar estado actual, identificar problemas concretos y hacer cambios enfocados.
 - Mantener una apariencia utilitaria premium: superficies blancas, bordes suaves, acentos verdes, colores de estado claros y sin sombras pesadas.
 - Preservar la paleta salvo cambio intencional del sistema de diseno: fondo `#F5F7FA`, superficie `#FFFFFF`, texto primario `#102033`, texto secundario `#64748B`, marca `#123F35`, accion `#16775F`, hover `#0F5F4A`, vencido `#D97706`, error `#DC2626`, info `#2563EB`.

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QProgressBar
+from PySide6.QtWidgets import QApplication, QProgressBar, QPushButton
 
 from domain.modelos import Course, StoredCredentials, SyncResult, Task
 from infrastructure.persistence import SQLiteTaskRepository
@@ -20,9 +20,12 @@ from presentation.qt.componentes.prototipo import (
     ToggleSwitch,
     ProgressRing,
 )
+from presentation.qt.componentes.shell import NavItem, SearchField, SyncStatusPill
+from presentation.qt.componentes.perfil import ProfileButton
 from presentation.qt.dialogo_login import LoginDialog
 from presentation.qt.dialogo_onboarding import OnboardingDialog
-from presentation.qt.ventana_principal import CommandPalette, MainWindow
+from presentation.qt.registro_iconos import IconRegistry
+from presentation.qt.ventana_principal import MainWindow
 
 
 class FakeCredentials:
@@ -123,6 +126,7 @@ class PresentationSmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
+        cls.app.setProperty("chivatask_testing", True)
 
     def test_main_window_builds_with_chivatask_title(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -157,7 +161,7 @@ class PresentationSmokeTests(unittest.TestCase):
         dialog = OnboardingDialog(FakeCredentials())
         self.assertEqual(dialog.windowTitle(), "Bienvenido a ChivaTask")
 
-    def test_command_palette_lists_navigation_and_cached_tasks(self):
+    def test_sidebar_uses_badges_without_global_search(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
             repo.upsert_courses([Course(1, "IS", "Curso", True)])
@@ -172,9 +176,12 @@ class PresentationSmokeTests(unittest.TestCase):
                 21600,
             )
             window.refresh_from_cache()
-            palette = CommandPalette(window, window.tasks, window.navigate, window._select_task)
-            self.assertGreaterEqual(palette.results.count(), 5)
-            palette.close()
+            button_texts = [button.text() for button in window.findChildren(QPushButton)]
+            self.assertFalse(any("Ctrl" in text for text in button_texts))
+            self.assertEqual(window.nav_buttons["tareas"].text_label.text(), "Tareas")
+            self.assertEqual(window.nav_buttons["tareas"].badge.text(), "1")
+            self.assertEqual(window.nav_buttons["cursos"].text_label.text(), "Cursos")
+            self.assertEqual(window.nav_buttons["cursos"].badge.text(), "1")
             window.close()
             repo.close()
 
@@ -207,6 +214,30 @@ class PresentationSmokeTests(unittest.TestCase):
         ring = ProgressRing(67, "Progreso global")
         self.assertEqual(ring.value, 67)
         self.assertEqual(ring.findChildren(QProgressBar), [])
+
+    def test_shell_components_expose_clean_state(self):
+        icons = IconRegistry()
+        nav = NavItem(icons.icon("home"), "Tareas")
+        nav.set_badge(12)
+        nav.set_active(True)
+        search = SearchField(icons.icon("search"), "Buscar...")
+        status = SyncStatusPill(icons.icon("check"))
+
+        status.set_status("Sincronizado", "ok")
+
+        self.assertEqual(nav.accessibleName(), "Tareas")
+        self.assertEqual(nav.text_label.text(), "Tareas")
+        self.assertEqual(nav.badge.text(), "12")
+        self.assertEqual(nav.objectName(), "navItemActive")
+        self.assertEqual(search.objectName(), "searchField")
+        self.assertEqual(status.text(), "Sincronizado")
+
+    def test_profile_button_shows_initials_and_display_name(self):
+        button = ProfileButton(IconRegistry(), FakeCredentials(), lambda: None, lambda: None)
+
+        self.assertEqual(button.avatar.text(), "HL")
+        self.assertEqual(button.name_label.text(), "Hugo Lopez")
+        self.assertEqual(button.accessibleName(), "Perfil local")
 
     def test_pill_filter_tracks_selected_value(self):
         pills = PillFilter([("Todas", "todas"), ("Urgentes", "urgentes")], "todas")
@@ -269,24 +300,25 @@ class PresentationSmokeTests(unittest.TestCase):
             window.close()
             repo.close()
 
-    def test_onboarding_is_marked_complete_after_successful_sync(self):
+    def test_main_window_does_not_prompt_login_on_startup_without_credentials(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            credentials = FakeCredentials()
+            credentials.clear_all()
             window = MainWindow(
                 repo,
-                FakeCredentials(),
+                credentials,
                 FakeNotifier(),
                 FakeNavigator(),
                 FakeAutostart(),
                 lambda: SyncResult(True, 0, 0, []),
                 21600,
             )
-            window.awaiting_onboarding_sync = True
 
-            window._sync_finished(SyncResult(True, 0, 0, []))
+            window.ensure_startup_sync()
 
-            self.assertTrue(window.settings.onboarding_completed())
-            self.assertFalse(window.awaiting_onboarding_sync)
+            self.assertEqual(window.status_pill.text(), "Credenciales pendientes")
+            self.assertFalse(window.syncing)
             window.close()
             repo.close()
 
@@ -310,6 +342,104 @@ class PresentationSmokeTests(unittest.TestCase):
             self.assertIn("#101820", stylesheet)
             self.assertNotIn("font-size: 19px", stylesheet)
             self.assertIsNone(repo.get_setting("ui_density"))
+            window.close()
+            repo.close()
+
+    def test_course_detail_uses_structured_cards(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            task = Task(10, 1, "IS", "Curso de Ingenieria", "Proyecto", None, None, "new")
+            summary = {
+                "course_id": 1,
+                "shortname": "IS",
+                "fullname": "Curso de Ingenieria",
+                "pending": 1,
+                "submitted": 2,
+                "total": 3,
+                "tasks": [task],
+            }
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            window._select_course_summary(summary)
+
+            self.assertEqual(window.course_detail_title.text(), "IS")
+            self.assertEqual(window.course_fullname_label.text(), "Curso de Ingenieria")
+            self.assertEqual(window.course_pending_card.value_label.text(), "1 pendiente")
+            self.assertIn("2 de 3 entregadas", window.course_progress_card.value_label.text())
+            self.assertIn("Proyecto", window.course_preview_card.value_label.text())
+            window.close()
+            repo.close()
+
+    def test_settings_pages_use_reference_structure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            window.navigate("ajustes")
+            frame_type = type(window.profile_summary)
+            self.assertEqual(window.profile_settings_name.text(), "Hugo Lopez")
+            self.assertIsNotNone(window.settings_stack.widget(0).findChild(frame_type, "profileSettingsCard"))
+            self.assertIsNotNone(window.settings_stack.widget(3).findChild(frame_type, "settingsInfoList"))
+            self.assertIsNotNone(window.settings_stack.widget(5).findChild(frame_type, "aboutHero"))
+            window.close()
+            repo.close()
+
+    def test_screenshot_smoke_views_render_nonblank(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            repo.upsert_courses([Course(1, "IS", "Curso de Ingenieria", True)])
+            repo.upsert_tasks([Task(10, 1, "IS", "Curso de Ingenieria", "Proyecto", None, None, "new")])
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+            window.resize(1366, 768)
+            window.show()
+            self.app.processEvents()
+
+            captures = []
+            for view in ("inicio", "tareas", "cursos", "ajustes"):
+                window.navigate(view)
+                window.refresh_from_cache()
+                self.app.processEvents()
+                pixmap = window.grab()
+                path = Path(tmp) / f"{view}.png"
+                self.assertTrue(pixmap.save(str(path)))
+                self.assertGreater(path.stat().st_size, 20_000)
+                captures.append(path)
+
+            login = LoginDialog(FakeCredentials())
+            login.resize(480, 420)
+            login.setStyleSheet(window.styleSheet())
+            login.show()
+            self.app.processEvents()
+            login_path = Path(tmp) / "login.png"
+            self.assertTrue(login.grab().save(str(login_path)))
+            self.assertGreater(login_path.stat().st_size, 8_000)
+
+            self.assertEqual(len(captures), 4)
+            login.close()
             window.close()
             repo.close()
 

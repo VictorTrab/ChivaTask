@@ -1,0 +1,4 @@
+interface:
+  display_name: "ChivaTask Visual Gate"
+  short_description: "Cierre visual con pruebas y capturas"
+  default_prompt: "Usa $chivatask-visual-quality-gate para cerrar una mejora UI de ChivaTask."
