@@ -54,15 +54,53 @@ def relative_due_text(due_at: int | None) -> str:
     return f"En {diff_days} días"
 
 
-def elided(text: str, max_chars: int) -> str:
-    if len(text) <= max_chars:
-        return text
-    return text[: max(0, max_chars - 1)].rstrip() + "..."
-
-
 def set_elided_text(label: QLabel, text: str, max_width: int) -> None:
     label.setToolTip(text)
     label.setText(QFontMetrics(label.font()).elidedText(text, Qt.ElideRight, max_width))
+
+
+class ElidedLabel(QLabel):
+    """Etiqueta que recalcula elision segun el ancho real disponible."""
+
+    def __init__(self, text: str = "", lines: int = 1) -> None:
+        super().__init__()
+        self.full_text = text
+        self.lines = max(1, lines)
+        self.setToolTip(text)
+        self.setWordWrap(lines > 1)
+        self.setText(text)
+
+    def set_full_text(self, text: str) -> None:
+        self.full_text = text
+        self.setToolTip(text)
+        self._refresh_elision()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._refresh_elision()
+
+    def _refresh_elision(self) -> None:
+        width = max(32, self.width() - 2)
+        metrics = QFontMetrics(self.font())
+        if self.lines <= 1:
+            self.setText(metrics.elidedText(self.full_text, Qt.ElideRight, width))
+            return
+        words = self.full_text.split()
+        if not words:
+            self.setText("")
+            return
+        first_line: list[str] = []
+        remaining = words[:]
+        while remaining:
+            candidate = " ".join([*first_line, remaining[0]])
+            if first_line and metrics.horizontalAdvance(candidate) > width:
+                break
+            first_line.append(remaining.pop(0))
+        if not remaining:
+            self.setText(" ".join(first_line))
+            return
+        second = metrics.elidedText(" ".join(remaining), Qt.ElideRight, width)
+        self.setText(f"{' '.join(first_line)}\n{second}")
 
 
 class MetricCard(QFrame):
@@ -130,8 +168,7 @@ class TaskRowCard(QFrame):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setAccessibleName(f"Tarea: {task.name}")
         self.setMinimumHeight(64 if compact else 76)
-        self.setMaximumHeight(78 if compact else 92)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 10 if compact else 13, 16, 10 if compact else 13)
         layout.setSpacing(12)
@@ -142,12 +179,10 @@ class TaskRowCard(QFrame):
 
         title_box = QVBoxLayout()
         title_box.setSpacing(3)
-        title = QLabel(elided(task.name, 72 if compact else 90))
+        title = ElidedLabel(task.name, 2)
         title.setObjectName("taskRowTitle")
-        title.setWordWrap(True)
-        title.setToolTip(task.name)
         meta_text = task.course_shortname or task.course_fullname
-        meta = QLabel(elided(meta_text, 56))
+        meta = ElidedLabel(meta_text, 1)
         meta.setObjectName("taskRowMeta")
         meta.setToolTip(task.course_fullname or meta_text)
         title_box.addWidget(title)
@@ -163,7 +198,6 @@ class TaskRowCard(QFrame):
         date_box.addWidget(rel_label)
 
         chip = StatusChip(STATUS_TEXT[bucket], CHIP_VARIANT[bucket])
-        chip.setMaximumWidth(112)
         if task.snoozed_until:
             chip.setText("Pospuesta")
             chip.setObjectName("chip-neutral")
@@ -205,10 +239,8 @@ class CourseCard(QFrame):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setAccessibleName(f"Curso: {summary['fullname']}")
         self.setMinimumWidth(300)
-        self.setMaximumWidth(620)
-        self.setMinimumHeight(174)
-        self.setMaximumHeight(196)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setMinimumHeight(190)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 14, 18, 14)
@@ -226,17 +258,14 @@ class CourseCard(QFrame):
         code = QLabel(str(summary["shortname"]))
         code.setObjectName("courseCode")
         fullname = str(summary["fullname"])
-        name = QLabel(elided(fullname, 52))
+        name = ElidedLabel(fullname, 2)
         name.setObjectName("courseName")
-        name.setToolTip(fullname)
-        name.setMaximumHeight(22)
         titles.addWidget(code)
         titles.addWidget(name)
 
         status_text = "Con vencidas" if has_overdue else "Al día" if pending == 0 else "Pendiente"
         status_variant = "overdue" if has_overdue else "ok" if pending == 0 else "undated"
         status = StatusChip(status_text, status_variant)
-        status.setMaximumWidth(112)
         header.addWidget(initials)
         header.addLayout(titles, 1)
         header.addWidget(status)
@@ -261,12 +290,12 @@ class CourseCard(QFrame):
         pending_label.setObjectName("courseMeta")
         tasks_button = QPushButton("Ver tareas")
         tasks_button.setObjectName("secondarySmallButton")
-        tasks_button.setMaximumWidth(104)
+        tasks_button.setMinimumWidth(108)
         tasks_button.setAccessibleName(f"Ver tareas de {summary['shortname']}")
         tasks_button.clicked.connect(lambda: self.view_tasks.emit(self.summary))
         campus_button = QPushButton("Campus")
         campus_button.setObjectName("primarySmallButton")
-        campus_button.setMaximumWidth(86)
+        campus_button.setMinimumWidth(88)
         campus_button.setAccessibleName(f"Abrir campus de {summary['shortname']}")
         campus_button.clicked.connect(lambda: self.open_campus.emit(self.summary))
         footer.addWidget(pending_label, 1)

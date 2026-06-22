@@ -574,6 +574,75 @@ QTreeWidget::item:selected, QListWidget::item:selected {
     font-size: 13px;
     font-weight: 700;
 }
+#courseTaskPreviewRow {
+    background: transparent;
+    border-bottom: 1px solid #EEF3F7;
+}
+#courseTaskPreviewRow:hover {
+    background: #F8FAFC;
+}
+#coursePreviewTitle {
+    color: #102033;
+    font-size: 13px;
+    font-weight: 800;
+}
+#todayPlanCard {
+    background: #ECFDF5;
+    border: 1px solid #6EE7B7;
+    border-radius: 16px;
+}
+#academicAlertsCard {
+    background: #FFFFFF;
+    border: 1px solid #D8E2EA;
+    border-radius: 14px;
+}
+#academicAlertRow {
+    color: #334155;
+    background: #F8FAFC;
+    border-left: 3px solid #16775F;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 700;
+}
+#recommendationCard-alta, #recommendationCard-media, #recommendationCard-planifica {
+    background: #FFFFFF;
+    border: 1px solid #D8E2EA;
+    border-radius: 14px;
+}
+#recommendationCard-alta {
+    border-left: 4px solid #D97706;
+}
+#recommendationCard-media {
+    border-left: 4px solid #16775F;
+}
+#recommendationCard-planifica {
+    border-left: 4px solid #2563EB;
+}
+#recommendationTitle {
+    color: #102033;
+    font-size: 14px;
+    font-weight: 900;
+}
+#recommendationDue {
+    color: #16775F;
+    font-size: 12px;
+    font-weight: 900;
+}
+#recommendationReason, #recommendationSecondary, #recommendationPlan {
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+}
+#recommendationSecondary {
+    color: #B45309;
+}
+#recommendationPlan {
+    background: #F8FAFC;
+    border: 1px solid #E8EEF4;
+    border-radius: 10px;
+    padding: 8px;
+}
 #primarySmallButton, #secondarySmallButton {
     border-radius: 9px;
     padding: 7px 11px;
@@ -1006,7 +1075,7 @@ QLineEdit, QComboBox, #baseModal, #searchField, #profileButton,
     color: #6EE7B7;
 }
 #profileName, #infoCardValue, #profileSettingsName, #settingsInfoValue,
-#courseDetailPercent, #coursePreviewText {
+#courseDetailPercent, #coursePreviewText, #coursePreviewTitle, #recommendationTitle {
     color: #E5EEF7;
 }
 #profileCaption, #infoCardLabel, #profileSettingsUsername, #settingsInfoLabel,
@@ -1015,6 +1084,36 @@ QLineEdit, QComboBox, #baseModal, #searchField, #profileButton,
 }
 #syncToastTitle {
     color: #E5EEF7;
+}
+#todayPlanCard {
+    background: #14352B;
+    border-color: #16775F;
+}
+#academicAlertsCard, #recommendationCard-alta, #recommendationCard-media,
+#recommendationCard-planifica {
+    background: #182331;
+    color: #E5EEF7;
+    border-color: #2B3A4A;
+}
+#academicAlertRow, #recommendationPlan {
+    background: #101820;
+    color: #C9D7E6;
+    border-color: #2B3A4A;
+}
+#recommendationDue {
+    color: #6EE7B7;
+}
+#recommendationReason, #recommendationPlan {
+    color: #C9D7E6;
+}
+#recommendationSecondary {
+    color: #FCD34D;
+}
+#courseTaskPreviewRow {
+    border-bottom-color: #2B3A4A;
+}
+#courseTaskPreviewRow:hover {
+    background: #203044;
 }
 #syncToastIcon {
     background: #14352B;

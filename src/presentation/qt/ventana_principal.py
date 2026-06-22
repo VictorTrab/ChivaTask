@@ -43,6 +43,7 @@ from application.puertos import (
 from application.servicio_ajustes import SettingsService
 from domain.modelos import SyncResult, Task, TaskBucket
 from domain.politica_tareas import classify_task
+from domain.priorizacion import TaskRecommendation, academic_alerts, recommend_tasks
 from domain.tiempo import now_ts, unix_to_local_text
 from shared.ajustes import APP_NAME
 from shared.errores import CredentialError
@@ -56,6 +57,7 @@ from .componentes.shell import NavItem, SearchField, SyncStatusPill, SyncToast
 from .componentes.prototipo import (
     CourseCard,
     EmptyState,
+    ElidedLabel,
     MetricCard,
     MiniCalendar,
     ProgressRing,
@@ -304,6 +306,35 @@ class MainWindow(QMainWindow):
         self.home_sections_layout.setSpacing(12)
         home_scroll = self._scroll_area(self.home_sections)
 
+        self.plan_card = QFrame()
+        self.plan_card.setObjectName("todayPlanCard")
+        self.plan_card.setMinimumHeight(330)
+        plan_layout = QVBoxLayout(self.plan_card)
+        plan_layout.setContentsMargins(18, 16, 18, 16)
+        plan_layout.setSpacing(12)
+        plan_title = QLabel("TU PLAN DE HOY")
+        plan_title.setObjectName("sectionTitle")
+        self.plan_cards_layout = QHBoxLayout()
+        self.plan_cards_layout.setSpacing(10)
+        self.plan_hint = QLabel("")
+        self.plan_hint.setObjectName("recommendationPlan")
+        self.plan_hint.setWordWrap(True)
+        plan_layout.addWidget(plan_title)
+        plan_layout.addLayout(self.plan_cards_layout)
+        plan_layout.addWidget(self.plan_hint)
+
+        self.alerts_card = QFrame()
+        self.alerts_card.setObjectName("academicAlertsCard")
+        alerts_layout = QVBoxLayout(self.alerts_card)
+        alerts_layout.setContentsMargins(16, 14, 16, 14)
+        alerts_layout.setSpacing(8)
+        alerts_title = QLabel("ALERTAS ACADÉMICAS")
+        alerts_title.setObjectName("sectionTitle")
+        self.alerts_layout = QVBoxLayout()
+        self.alerts_layout.setSpacing(6)
+        alerts_layout.addWidget(alerts_title)
+        alerts_layout.addLayout(self.alerts_layout)
+
         current = date.today()
         self.calendar = MiniCalendar(current.year, current.month, {})
         self.progress_ring = ProgressRing(0, "Progreso global")
@@ -314,6 +345,8 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.greeting_date)
         main_layout.addWidget(self.greeting_title)
         main_layout.addLayout(stats)
+        main_layout.addWidget(self.plan_card)
+        main_layout.addWidget(self.alerts_card)
         main_layout.addWidget(self.next_deadline_card)
         main_layout.addWidget(home_scroll, 1)
         layout.addWidget(main, 1)
@@ -397,8 +430,11 @@ class MainWindow(QMainWindow):
         self.task_detail.layout.addWidget(self.snooze_button)
         self.task_detail.layout.addStretch(1)
 
+        self.task_detail_scroll = self._scroll_area(self.task_detail)
+        self.task_detail_scroll.setMinimumWidth(280)
+        self.task_detail_scroll.setMaximumWidth(340)
         layout.addWidget(left, 1)
-        layout.addWidget(self.task_detail)
+        layout.addWidget(self.task_detail_scroll)
         return view
 
     def _build_cursos_view(self) -> QWidget:
@@ -437,6 +473,10 @@ class MainWindow(QMainWindow):
         course_metrics.addWidget(self.course_total_metric, 0, 0)
         course_metrics.addWidget(self.course_pending_metric, 0, 1)
         course_metrics.addWidget(self.course_overdue_metric, 0, 2)
+        self.course_metrics_caption = QLabel("Resumen general")
+        self.course_metrics_caption.setObjectName("muted")
+        self.course_filter_caption = QLabel("")
+        self.course_filter_caption.setObjectName("muted")
         self.course_cards_container = QWidget()
         self.course_cards_layout = QGridLayout(self.course_cards_container)
         self.course_cards_layout.setContentsMargins(0, 0, 0, 0)
@@ -449,7 +489,9 @@ class MainWindow(QMainWindow):
         self.course_count_label.setObjectName("muted")
         left_layout.addLayout(course_filters)
         left_layout.addWidget(self.course_filter)
+        left_layout.addWidget(self.course_metrics_caption)
         left_layout.addLayout(course_metrics)
+        left_layout.addWidget(self.course_filter_caption)
         left_layout.addWidget(self.course_scroll, 1)
         left_layout.addWidget(self.course_count_label)
 
@@ -480,7 +522,6 @@ class MainWindow(QMainWindow):
         detail_header_layout.addWidget(self.course_detail_initials)
         detail_header_layout.addLayout(detail_title_box, 1)
         self.course_detail_status = StatusChip("Sin selección", "neutral")
-        self.course_detail_status.setMaximumWidth(120)
         detail_header_layout.addWidget(self.course_detail_status)
 
         self.course_progress_card = QFrame()
@@ -511,16 +552,19 @@ class MainWindow(QMainWindow):
         self.course_pending_card = InfoCard("Pendientes", "-")
         self.course_preview_card = QFrame()
         self.course_preview_card.setObjectName("settingsInfoList")
-        preview_layout = QVBoxLayout(self.course_preview_card)
-        preview_layout.setContentsMargins(16, 14, 16, 14)
-        preview_layout.setSpacing(8)
+        self.course_preview_layout = QVBoxLayout(self.course_preview_card)
+        self.course_preview_layout.setContentsMargins(16, 14, 16, 14)
+        self.course_preview_layout.setSpacing(8)
         self.course_preview_title = QLabel("Próximas tareas")
         self.course_preview_title.setObjectName("infoCardLabel")
-        self.course_tasks_label = QLabel("-")
-        self.course_tasks_label.setObjectName("coursePreviewText")
-        self.course_tasks_label.setWordWrap(True)
-        preview_layout.addWidget(self.course_preview_title)
-        preview_layout.addWidget(self.course_tasks_label)
+        self.course_preview_rows = QVBoxLayout()
+        self.course_preview_rows.setSpacing(0)
+        self.course_preview_more = QPushButton("Ver tareas del curso")
+        self.course_preview_more.setObjectName("linkButton")
+        self.course_preview_more.clicked.connect(self._show_selected_course_tasks)
+        self.course_preview_layout.addWidget(self.course_preview_title)
+        self.course_preview_layout.addLayout(self.course_preview_rows)
+        self.course_preview_layout.addWidget(self.course_preview_more)
         open_course = PrimaryButton("Abrir Moodle", self.icons.icon("external", "light"))
         open_course.clicked.connect(lambda _checked=False: self.navigator.open_campus_home())
         view_tasks = SecondaryButton("Ver tareas del curso", self.icons.icon("tasks", "muted"))
@@ -533,8 +577,11 @@ class MainWindow(QMainWindow):
         self.course_detail.layout.addWidget(view_tasks)
         self.course_detail.layout.addStretch(1)
 
+        self.course_detail_scroll = self._scroll_area(self.course_detail)
+        self.course_detail_scroll.setMinimumWidth(300)
+        self.course_detail_scroll.setMaximumWidth(360)
         layout.addWidget(left, 1)
-        layout.addWidget(self.course_detail)
+        layout.addWidget(self.course_detail_scroll)
         return view
 
     def _build_ajustes_view(self) -> QWidget:
@@ -937,7 +984,7 @@ class MainWindow(QMainWindow):
         compact = self.width() < 1180
         if hasattr(self, "sidebar"):
             self.sidebar.setFixedWidth(176 if compact else 220)
-        for panel_name in ("home_side", "task_detail", "course_detail"):
+        for panel_name in ("home_side", "task_detail_scroll", "course_detail_scroll"):
             panel = getattr(self, panel_name, None)
             if panel is not None:
                 panel.setVisible(not compact)
@@ -974,6 +1021,9 @@ class MainWindow(QMainWindow):
             )
         else:
             self.next_deadline_card.hide()
+        recommendations = recommend_tasks(self.tasks, limit=3)
+        self._render_today_plan(recommendations)
+        self._render_academic_alerts(academic_alerts(self.tasks))
         self._clear_layout(self.home_sections_layout)
         sections = [
             ("Vencidas", self.queries.overdue_tasks(), "No hay tareas vencidas."),
@@ -993,6 +1043,86 @@ class MainWindow(QMainWindow):
         progress = self.queries.global_progress()
         self.progress_ring.update_value(progress["percent"], f"{progress['submitted']} de {progress['total']} actividades")
         self.calendar.set_month(today.year, today.month, self.queries.calendar_marks(today.year, today.month))
+
+    def _render_today_plan(self, recommendations: list[TaskRecommendation]) -> None:
+        self._clear_layout(self.plan_cards_layout)
+        if not recommendations:
+            self.plan_hint.setText("")
+            self.plan_cards_layout.addWidget(
+                EmptyState(
+                    "Sin pendientes prioritarios",
+                    "No hay tareas pendientes para recomendar con los datos guardados.",
+                    self.icons.icon("check", "brand"),
+                )
+            )
+            return
+        has_exam = any(item.is_possible_exam for item in recommendations)
+        if has_exam:
+            self.plan_hint.setText(
+                "Plan sugerido: confirma fecha, modalidad e indicaciones en Moodle; reserva bloques de estudio antes de la fecha."
+            )
+        else:
+            self.plan_hint.setText(
+                "Plan sugerido: revisa instrucciones, identifica la entrega, trabaja primero la fecha cercana y sincroniza despues de enviar."
+            )
+        labels = ["EMPIEZA POR AQUÍ", "DESPUÉS", "PLANIFICA"]
+        for index, recommendation in enumerate(recommendations[:3]):
+            card = self._recommendation_card(labels[index], recommendation)
+            self.plan_cards_layout.addWidget(card, 1)
+
+    def _recommendation_card(self, label: str, recommendation: TaskRecommendation) -> QFrame:
+        task = recommendation.task
+        card = QFrame()
+        card.setObjectName(f"recommendationCard-{recommendation.level}")
+        card.setMinimumHeight(210)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(7)
+        eyebrow = QLabel(label)
+        eyebrow.setObjectName("infoCardLabel")
+        title = ElidedLabel(task.name, 2)
+        title.setObjectName("recommendationTitle")
+        course = QLabel(task.course_fullname or task.course_shortname)
+        course.setObjectName("muted")
+        course.setWordWrap(True)
+        due = QLabel(relative_due_text(task.due_at))
+        due.setObjectName("recommendationDue")
+        reason = QLabel(recommendation.primary_reason)
+        reason.setObjectName("recommendationReason")
+        reason.setWordWrap(True)
+        layout.addWidget(eyebrow)
+        layout.addWidget(title)
+        layout.addWidget(course)
+        layout.addWidget(due)
+        layout.addWidget(reason)
+        if recommendation.secondary_reason:
+            secondary = QLabel(recommendation.secondary_reason)
+            secondary.setObjectName("recommendationSecondary")
+            secondary.setWordWrap(True)
+            layout.addWidget(secondary)
+        actions = QVBoxLayout()
+        primary_actions = QHBoxLayout()
+        open_button = PrimaryButton("Abrir campus", self.icons.icon("external", "light"))
+        open_button.clicked.connect(lambda _checked=False, selected=task: self._open_task_url(selected))
+        detail_button = SecondaryButton("Ver detalle", self.icons.icon("tasks", "muted"))
+        detail_button.clicked.connect(lambda _checked=False, selected=task: self._open_task_from_card(selected))
+        primary_actions.addWidget(open_button)
+        primary_actions.addWidget(detail_button)
+        actions.addLayout(primary_actions)
+        if label == "EMPIEZA POR AQUÍ" and not recommendation.is_possible_exam:
+            snooze_button = SecondaryButton("Recordar mañana", self.icons.icon("clock", "muted"))
+            snooze_button.clicked.connect(lambda _checked=False, selected=task: self._snooze_task(selected, 1))
+            actions.addWidget(snooze_button)
+        layout.addLayout(actions)
+        return card
+
+    def _render_academic_alerts(self, alerts: list[str]) -> None:
+        self._clear_layout(self.alerts_layout)
+        for alert in alerts:
+            row = QLabel(alert)
+            row.setObjectName("academicAlertRow")
+            row.setWordWrap(True)
+            self.alerts_layout.addWidget(row)
 
     def refresh_task_list(self) -> None:
         if not hasattr(self, "task_list_layout"):
@@ -1015,6 +1145,9 @@ class MainWindow(QMainWindow):
             )
         self._clear_layout(self.task_list_layout)
         self._task_by_id = {task.assignment_id: task for task in self.filtered_tasks}
+        if self.selected_task and self.selected_task.assignment_id not in self._task_by_id:
+            self.selected_task = None
+            self._render_task_detail(None)
         if not self.filtered_tasks:
             if self.tasks:
                 self._set_data_state("filtered-empty")
@@ -1070,6 +1203,10 @@ class MainWindow(QMainWindow):
                 continue
             filtered.append(summary)
         self.course_summaries = filtered
+        filtered_ids = {int(summary["course_id"]) for summary in filtered}
+        if self.selected_course and int(self.selected_course["course_id"]) not in filtered_ids:
+            self.selected_course = None
+            self._render_course_detail()
         self._clear_layout(self.course_cards_layout)
         available_width = self.course_scroll.viewport().width() if hasattr(self, "course_scroll") else 0
         columns = 1 if self.width() < 1180 else 2 if available_width >= 700 else 1
@@ -1083,6 +1220,12 @@ class MainWindow(QMainWindow):
             self.course_cards_layout.addWidget(card, index // columns, index % columns)
         self.course_scroll.verticalScrollBar().setValue(0)
         self.course_count_label.setText(f"{len(filtered)} de {len(summaries)} cursos")
+        filter_labels = {
+            "todos": "Todos",
+            "con_pendientes": "Con pendientes",
+            "sin_pendientes": "Sin pendientes",
+        }
+        self.course_filter_caption.setText(f"{filter_labels.get(mode, 'Filtro')} · {len(filtered)} cursos")
 
     def _fill_task_table(self, table: QTableWidget, tasks: list[Task]) -> None:
         table.setRowCount(len(tasks))
@@ -1102,6 +1245,17 @@ class MainWindow(QMainWindow):
     def _open_task_from_card(self, task: Task) -> None:
         self.navigate("tareas")
         self._select_task(task)
+
+    def _open_task_url(self, task: Task) -> None:
+        if task.url:
+            opened = self.navigator.open_url(task.url)
+            if not opened:
+                QMessageBox.warning(self, "URL bloqueada", "Solo se abren enlaces HTTPS permitidos del campus.")
+
+    def _snooze_task(self, task: Task, days: int) -> None:
+        until = int((datetime.now() + timedelta(days=days)).timestamp())
+        self.repository.snooze(task.assignment_id, until)
+        self.refresh_from_cache()
 
     def _select_urgent_task(self) -> None:
         rows = self.urgent_table.selectionModel().selectedRows()
@@ -1207,7 +1361,7 @@ class MainWindow(QMainWindow):
             self.course_progress_bar.setValue(0)
             self.course_progress_bar.setObjectName("courseProgress-ok")
             self.course_progress_updated.setText("")
-            self.course_tasks_label.setText("-")
+            self._render_course_preview_rows([])
             return
         total = int(course["total"])
         submitted = int(course["submitted"])
@@ -1220,8 +1374,9 @@ class MainWindow(QMainWindow):
         status_variant = "overdue" if has_overdue else "ok" if pending == 0 else "undated"
         self.course_detail_initials.setText(str(course["shortname"])[:2].upper())
         self.course_detail_code.setText(str(course["shortname"]))
-        self.course_detail_title.setText(str(course["shortname"]))
-        self.course_fullname_label.setText(str(course["fullname"]))
+        self.course_detail_title.setText(str(course["fullname"]))
+        self.course_detail_title.setToolTip(str(course["fullname"]))
+        self.course_fullname_label.setText("")
         self._set_chip(self.course_detail_status, status_text, status_variant)
         self.course_pending_card.update_value(
             "Pendientes",
@@ -1234,8 +1389,36 @@ class MainWindow(QMainWindow):
         self.course_progress_bar.style().unpolish(self.course_progress_bar)
         self.course_progress_bar.style().polish(self.course_progress_bar)
         self.course_progress_updated.setText(f"Actualizado: {self._sync_status_detail() or 'sin registro'}")
-        preview = "\n".join(f"- {task.name} - {STATUS_TEXT[classify_task(task)]}" for task in tasks[:5])
-        self.course_tasks_label.setText(preview or "Todo entregado. Sin pendientes.")
+        self._render_course_preview_rows(tasks)
+
+    def _render_course_preview_rows(self, tasks: list[Task]) -> None:
+        self._clear_layout(self.course_preview_rows)
+        if not tasks:
+            row = QLabel("Todo entregado. Sin pendientes.")
+            row.setObjectName("coursePreviewText")
+            row.setWordWrap(True)
+            self.course_preview_rows.addWidget(row)
+            self.course_preview_more.hide()
+            return
+        self.course_preview_more.show()
+        for task in tasks[:3]:
+            row = QFrame()
+            row.setObjectName("courseTaskPreviewRow")
+            row.setCursor(Qt.PointingHandCursor)
+            row.setToolTip(task.name)
+            row_layout = QVBoxLayout(row)
+            row_layout.setContentsMargins(0, 8, 0, 8)
+            row_layout.setSpacing(2)
+            title = ElidedLabel(task.name, 1)
+            title.setObjectName("coursePreviewTitle")
+            meta = QLabel(unix_to_local_text(task.due_at) if task.due_at else STATUS_TEXT[classify_task(task)])
+            meta.setObjectName("muted")
+            row_layout.addWidget(title)
+            row_layout.addWidget(meta)
+            row.mousePressEvent = lambda event, selected=task: self._open_task_from_card(selected)  # type: ignore[method-assign]
+            self.course_preview_rows.addWidget(row)
+        remaining = len(tasks) - 3
+        self.course_preview_more.setText(f"Ver las {len(tasks)} tareas →" if remaining > 0 else "Ver tareas del curso")
 
     def _build_course_detail_modal(self, course: dict[str, object]) -> BaseModal:
         total = int(course["total"])

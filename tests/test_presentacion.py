@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeyEvent
-from PySide6.QtWidgets import QApplication, QProgressBar, QPushButton
+from PySide6.QtWidgets import QApplication, QLabel, QProgressBar, QPushButton, QScrollArea
 
 from domain.modelos import Course, StoredCredentials, SyncResult, Task
 from infrastructure.persistence import SQLiteTaskRepository
@@ -14,6 +14,7 @@ from presentation.qt.bandeja import TrayController
 from presentation.qt.componentes.botones import IconButton, PrimaryButton, SecondaryButton
 from presentation.qt.componentes.prototipo import (
     CourseCard,
+    ElidedLabel,
     MiniCalendar,
     PillFilter,
     SegmentedControl,
@@ -229,6 +230,29 @@ class PresentationSmokeTests(unittest.TestCase):
         self.assertEqual(opened, [summary])
         for widget in widgets:
             self.assertIsNotNone(widget.objectName())
+
+    def test_course_card_allows_long_names_and_full_status_chip(self):
+        task = Task(10, 1, "IS", "Curso", "Parcial", 1, None, "new")
+        summary = {
+            "course_id": 1,
+            "shortname": "IS-441 - IIP-2026",
+            "fullname": "Traductores e Interpretes II con nombre academico deliberadamente largo",
+            "pending": 1,
+            "submitted": 4,
+            "total": 5,
+            "tasks": [task],
+        }
+
+        card = CourseCard(summary)
+        labels = card.findChildren(QLabel)
+        name_labels = [label for label in labels if isinstance(label, ElidedLabel) and label.toolTip() == summary["fullname"]]
+        chips = [label for label in labels if label.text() == "Con vencidas"]
+
+        self.assertTrue(name_labels)
+        self.assertEqual(name_labels[0].lines, 2)
+        self.assertGreaterEqual(card.maximumHeight(), 16_000)
+        self.assertTrue(chips)
+        self.assertGreaterEqual(chips[0].sizeHint().width(), chips[0].minimumSizeHint().width())
 
     def test_clickable_cards_are_keyboard_accessible(self):
         task = Task(10, 1, "IS", "Curso", "Tarea", None, None, "new")
@@ -467,12 +491,14 @@ class PresentationSmokeTests(unittest.TestCase):
 
             window._select_course_summary(summary)
 
-            self.assertEqual(window.course_detail_title.text(), "IS")
-            self.assertEqual(window.course_fullname_label.text(), "Curso de Ingenieria")
+            self.assertEqual(window.course_detail_title.text(), "Curso de Ingenieria")
+            self.assertEqual(window.course_fullname_label.text(), "")
             self.assertEqual(window.course_pending_card.value_label.text(), "1 pendiente")
             self.assertEqual(window.course_progress_percent.text(), "66%")
             self.assertIn("2 de 3 entregadas", window.course_progress_text.text())
-            self.assertIn("Proyecto", window.course_tasks_label.text())
+            preview_titles = [label.text() for label in window.course_preview_card.findChildren(QLabel)]
+            self.assertIn("Proyecto", " ".join(preview_titles))
+            self.assertIsInstance(window.course_detail_scroll, QScrollArea)
             window.close()
             repo.close()
 
@@ -498,7 +524,92 @@ class PresentationSmokeTests(unittest.TestCase):
             self.assertEqual(window.course_total_metric.value_label.text(), "2")
             self.assertEqual(window.course_pending_metric.value_label.text(), "2")
             self.assertEqual(window.course_overdue_metric.value_label.text(), "1")
+            self.assertEqual(window.course_metrics_caption.text(), "Resumen general")
+            window.course_filter.set_value("sin_pendientes")
+            self.assertIn("Sin pendientes", window.course_filter_caption.text())
             self.assertFalse(any("Ctrl" in button.text() for button in window.findChildren(QPushButton)))
+            window.close()
+            repo.close()
+
+    def test_course_filter_clears_obsolete_selection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            pending = Task(10, 1, "IS", "Curso IS", "Proyecto", 1, None, "new")
+            done = Task(20, 2, "MA", "Curso MA", "Tarea", None, None, "submitted")
+            repo.upsert_courses([Course(1, "IS", "Curso IS", True), Course(2, "MA", "Curso MA", True)])
+            repo.upsert_tasks([pending, done])
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            window.refresh_course_list()
+            window._select_course_summary(window.course_summaries[0])
+            window.course_filter.set_value("sin_pendientes")
+
+            self.assertIsNone(window.selected_course)
+            self.assertEqual(window.course_detail_title.text(), "Selecciona un curso")
+            window.close()
+            repo.close()
+
+    def test_task_filter_clears_obsolete_selection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            overdue = Task(10, 1, "IS", "Curso IS", "Vencida", 1, None, "new")
+            undated = Task(20, 2, "MA", "Curso MA", "Sin fecha", None, None, "new")
+            repo.upsert_courses([Course(1, "IS", "Curso IS", True), Course(2, "MA", "Curso MA", True)])
+            repo.upsert_tasks([overdue, undated])
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            window.refresh_task_list()
+            window._select_task(overdue)
+            window.task_filter.set_value("sin_fecha")
+
+            self.assertIsNone(window.selected_task)
+            self.assertEqual(window.detail_title.text(), "Selecciona una tarea")
+            window.close()
+            repo.close()
+
+    def test_home_renders_priority_plan_and_real_alerts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            now = 1
+            overdue = Task(10, 1, "IS", "Curso IS", "TAREA PARCIAL II", now, None, "new")
+            exam = Task(20, 1, "IS", "Curso IS", "Evaluacion unidad 3", now + 86400, None, "new")
+            undated = Task(30, 2, "MA", "Curso MA", "Actividad sin fecha", None, None, "new")
+            repo.upsert_courses([Course(1, "IS", "Curso IS", True), Course(2, "MA", "Curso MA", True)])
+            repo.upsert_tasks([overdue, exam, undated])
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            window.refresh_from_cache()
+            texts = " ".join(label.text() for label in window.plan_card.findChildren(QLabel))
+            alerts = " ".join(label.text() for label in window.alerts_card.findChildren(QLabel))
+
+            self.assertIn("TU PLAN DE HOY", texts)
+            self.assertLessEqual(len(window.plan_card.findChildren(QPushButton)), 9)
+            self.assertIn("Prioridad", texts)
+            self.assertIn("Posible evaluacion", alerts)
             window.close()
             repo.close()
 
