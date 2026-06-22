@@ -5,16 +5,18 @@ import unittest
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication, QProgressBar, QPushButton
 
 from domain.modelos import Course, StoredCredentials, SyncResult, Task
 from infrastructure.persistence import SQLiteTaskRepository
-from infrastructure.security import WindowsCredentialRepository
 from presentation.qt.bandeja import TrayController
+from presentation.qt.componentes.botones import IconButton, PrimaryButton, SecondaryButton
 from presentation.qt.componentes.prototipo import (
     CourseCard,
     MiniCalendar,
     PillFilter,
+    SegmentedControl,
     SettingsRow,
     TaskRowCard,
     ToggleSwitch,
@@ -153,9 +155,20 @@ class PresentationSmokeTests(unittest.TestCase):
                 repo.close()
 
     def test_login_dialog_builds(self):
-        dialog = LoginDialog(WindowsCredentialRepository("uph_pendientes_test_no_write"))
+        dialog = LoginDialog(FakeCredentials())
         self.assertEqual(dialog.windowTitle(), "Conecta tu campus")
+        self.assertEqual(dialog.objectName(), "accessWindow")
         self.assertEqual(dialog.password.placeholderText(), "Contraseña del campus")
+        self.assertEqual(dialog.username.accessibleName(), "Usuario del campus")
+        self.assertEqual(dialog.password.accessibleName(), "Contraseña del campus")
+
+    def test_login_dialog_shows_inline_validation(self):
+        dialog = LoginDialog(FakeCredentials())
+
+        dialog.save()
+
+        self.assertFalse(dialog.error_label.isHidden())
+        self.assertIn("usuario y contraseña", dialog.error_label.text())
 
     def test_onboarding_dialog_builds(self):
         dialog = OnboardingDialog(FakeCredentials())
@@ -205,10 +218,42 @@ class PresentationSmokeTests(unittest.TestCase):
             PillFilter([("Todas", "todas"), ("Vencidas", "vencidas")], "todas"),
             row,
         ]
+        opened = []
+        widgets[1].open_campus.connect(opened.append)
+        widgets[1].open_campus.emit(summary)
         self.assertTrue(toggle.isChecked())
         self.assertEqual(toggle.text(), "")
+        self.assertEqual(opened, [summary])
         for widget in widgets:
             self.assertIsNotNone(widget.objectName())
+
+    def test_clickable_cards_are_keyboard_accessible(self):
+        task = Task(10, 1, "IS", "Curso", "Tarea", None, None, "new")
+        summary = {
+            "course_id": 1,
+            "shortname": "IS",
+            "fullname": "Curso",
+            "pending": 1,
+            "submitted": 2,
+            "total": 3,
+            "tasks": [task],
+        }
+        task_card = TaskRowCard(task)
+        course_card = CourseCard(summary)
+        selected_tasks = []
+        selected_courses = []
+        task_card.selected.connect(selected_tasks.append)
+        course_card.selected.connect(selected_courses.append)
+
+        task_card.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Return, Qt.NoModifier))
+        course_card.keyPressEvent(QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Space, Qt.NoModifier))
+
+        self.assertEqual(task_card.focusPolicy(), Qt.StrongFocus)
+        self.assertEqual(course_card.focusPolicy(), Qt.StrongFocus)
+        self.assertEqual(task_card.accessibleName(), "Tarea: Tarea")
+        self.assertEqual(course_card.accessibleName(), "Curso: Curso")
+        self.assertEqual(selected_tasks, [task])
+        self.assertEqual(selected_courses, [summary])
 
     def test_progress_ring_is_not_a_progress_bar_wrapper(self):
         ring = ProgressRing(67, "Progreso global")
@@ -217,11 +262,11 @@ class PresentationSmokeTests(unittest.TestCase):
 
     def test_shell_components_expose_clean_state(self):
         icons = IconRegistry()
-        nav = NavItem(icons.icon("home"), "Tareas")
+        nav = NavItem(icons.icon("home", "light"), "Tareas")
         nav.set_badge(12)
         nav.set_active(True)
-        search = SearchField(icons.icon("search"), "Buscar...")
-        status = SyncStatusPill(icons.icon("check"))
+        search = SearchField(icons.icon("search", "muted"), "Buscar...")
+        status = SyncStatusPill(icons.icon("check", "brand"))
 
         status.set_status("Sincronizado", "ok")
 
@@ -231,6 +276,17 @@ class PresentationSmokeTests(unittest.TestCase):
         self.assertEqual(nav.objectName(), "navItemActive")
         self.assertEqual(search.objectName(), "searchField")
         self.assertEqual(status.text(), "Sincronizado")
+
+    def test_base_buttons_expose_accessible_names(self):
+        icons = IconRegistry()
+        primary = PrimaryButton("Guardar", icons.icon("check", "light"))
+        secondary = SecondaryButton("Cancelar")
+        icon = IconButton(icons.icon("settings", "muted"), "Configurar")
+
+        self.assertEqual(primary.accessibleName(), "Guardar")
+        self.assertEqual(secondary.accessibleName(), "Cancelar")
+        self.assertEqual(icon.accessibleName(), "Configurar")
+        self.assertEqual(icon.toolTip(), "Configurar")
 
     def test_profile_button_shows_initials_and_display_name(self):
         button = ProfileButton(IconRegistry(), FakeCredentials(), lambda: None, lambda: None)
@@ -244,6 +300,14 @@ class PresentationSmokeTests(unittest.TestCase):
         self.assertEqual(pills.currentData(), "todas")
         pills.set_value("urgentes")
         self.assertEqual(pills.currentData(), "urgentes")
+
+    def test_filter_controls_are_keyboard_accessible(self):
+        pills = PillFilter([("Todas", "todas"), ("Urgentes", "urgentes")], "todas")
+        segments = SegmentedControl([("Todos", "todos"), ("Sin pendientes", "sin")], "todos")
+
+        for button in [*pills.buttons.values(), *segments.buttons.values()]:
+            self.assertEqual(button.focusPolicy(), Qt.StrongFocus)
+            self.assertTrue(button.accessibleName())
 
     def test_open_data_folder_uses_repository_parent(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -375,6 +439,45 @@ class PresentationSmokeTests(unittest.TestCase):
             self.assertEqual(window.course_pending_card.value_label.text(), "1 pendiente")
             self.assertIn("2 de 3 entregadas", window.course_progress_card.value_label.text())
             self.assertIn("Proyecto", window.course_preview_card.value_label.text())
+            window.close()
+            repo.close()
+
+    def test_compact_detail_modals_expose_primary_actions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            task = Task(10, 1, "IS", "Curso de Ingenieria", "Proyecto final", None, None, "new")
+            summary = {
+                "course_id": 1,
+                "shortname": "IS",
+                "fullname": "Curso de Ingenieria",
+                "pending": 1,
+                "submitted": 2,
+                "total": 3,
+                "tasks": [task],
+            }
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            task_modal = window._build_task_detail_modal(task)
+            course_modal = window._build_course_detail_modal(summary)
+            task_buttons = [button.text() for button in task_modal.findChildren(QPushButton)]
+            course_buttons = [button.text() for button in course_modal.findChildren(QPushButton)]
+
+            self.assertIn("Abrir campus", task_buttons)
+            self.assertIn("Recordar mañana", task_buttons)
+            self.assertIn("Abrir Moodle", course_buttons)
+            self.assertIn("Ver tareas", course_buttons)
+            self.assertGreaterEqual(window.task_detail.minimumWidth(), 280)
+            self.assertLessEqual(window.task_detail.maximumWidth(), 340)
+            task_modal.close()
+            course_modal.close()
             window.close()
             repo.close()
 
@@ -528,6 +631,10 @@ class PresentationSmokeTests(unittest.TestCase):
 
             self.assertEqual(window.task_search.accessibleName(), "Buscar tareas")
             self.assertEqual(window.course_search.accessibleName(), "Buscar cursos")
+            self.assertEqual(window.task_sort.accessibleName(), "Ordenar tareas")
+            self.assertEqual(window.course_filter.accessibleName(), "Filtrar cursos")
+            self.assertEqual(window.interval_combo.accessibleName(), "Intervalo de sincronización")
+            self.assertEqual(window.notif_mode.accessibleName(), "Modo de notificaciones")
             self.assertEqual(window.sync_button.accessibleName(), "Sincronizar tareas")
             self.assertEqual(window.data_state_label.property("dataState"), "empty")
             self.assertEqual(window._greeting_for_hour(9), "Buenos días")

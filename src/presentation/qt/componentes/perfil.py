@@ -86,9 +86,9 @@ class ProfileMenu(QMenu):
         self.credentials = credentials
         self.user_action = QAction("Sin perfil", self)
         self.user_action.setEnabled(False)
-        change_action = QAction(icons.icon("user_switch"), "Cambiar perfil", self)
+        change_action = QAction(icons.icon("user_switch", "muted"), "Cambiar perfil", self)
         change_action.triggered.connect(on_change_profile)
-        logout_action = QAction(icons.icon("logout"), "Cerrar sesión local", self)
+        logout_action = QAction(icons.icon("logout", "danger"), "Cerrar sesión local", self)
         logout_action.triggered.connect(on_logout)
         self.addAction(self.user_action)
         self.addSeparator()

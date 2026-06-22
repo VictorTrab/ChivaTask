@@ -15,6 +15,44 @@ QWidget {
 QLabel {
     background: transparent;
 }
+#accessWindow {
+    background: #0B3B32;
+}
+#accessCard {
+    background: #FFFFFF;
+    border: 1px solid #D8E2EA;
+    border-radius: 18px;
+}
+#accessTitle {
+    color: #102033;
+    font-size: 22px;
+    font-weight: 900;
+}
+#accessSubtitle {
+    color: #53657F;
+    font-size: 13px;
+}
+#accessFieldLabel {
+    color: #102033;
+    font-size: 13px;
+    font-weight: 800;
+}
+#accessInfo {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border: 1px solid #BFDBFE;
+    border-radius: 12px;
+    padding: 12px;
+    font-weight: 700;
+}
+#accessError {
+    background: #FEF2F2;
+    color: #B91C1C;
+    border: 1px solid #FECACA;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-weight: 800;
+}
 #sidebar {
     background: #123F35;
     color: white;
@@ -368,6 +406,10 @@ QTreeWidget::item:selected, QListWidget::item:selected {
 #taskRow-overdue:hover, #taskRow-pending:hover, #taskRow-undated:hover {
     background: #F8FAFC;
 }
+#taskRow-overdue:focus, #taskRow-pending:focus, #taskRow-undated:focus, #taskRow-ok:focus {
+    background: #FCFFFD;
+    border: 1px solid #6EE7B7;
+}
 #taskRowTitle {
     color: #102033;
     font-size: 14px;
@@ -392,6 +434,10 @@ QTreeWidget::item:selected, QListWidget::item:selected {
 }
 #courseCard:hover {
     border: 1px solid #16775F;
+    background: #FCFFFD;
+}
+#courseCard:focus {
+    border: 1px solid #6EE7B7;
     background: #FCFFFD;
 }
 #courseInitials {
@@ -434,6 +480,23 @@ QTreeWidget::item:selected, QListWidget::item:selected {
     background: #FFFFFF;
     color: #102033;
     border: 1px solid #D8E2EA;
+}
+#primarySmallButton:hover {
+    background: #0F5F4A;
+}
+#secondarySmallButton:hover {
+    background: #F8FAFC;
+    border-color: #B7E4D4;
+}
+#primarySmallButton:focus, #secondarySmallButton:focus,
+#pill:focus, #pillActive:focus, #segment:focus, #segmentActive:focus {
+    border: 1px solid #6EE7B7;
+}
+#primarySmallButton:disabled, #secondarySmallButton:disabled,
+#pill:disabled, #pillActive:disabled, #segment:disabled, #segmentActive:disabled {
+    background: #E2E8F0;
+    color: #94A3B8;
+    border: 1px solid #CBD5E1;
 }
 #emptyState {
     background: #FFFFFF;
@@ -534,6 +597,10 @@ QTreeWidget::item:selected, QListWidget::item:selected {
 #segment {
     background: transparent;
     color: #64748B;
+}
+#segment:hover {
+    background: #F8FAFC;
+    color: #102033;
 }
 #segmentActive {
     background: #16775F;
@@ -805,7 +872,7 @@ QWidget {
 #settingsRowSubtitle, #progressRingLabel, #calendarDow {
     color: #9FB0C3;
 }
-#footer, #detailPanel, #settingsCard, #statCard-default, #statCard-warning,
+#footer, #detailPanel, #settingsCard, #accessCard, #statCard-default, #statCard-warning,
 #statCard-ok, #metricCard-default, #metricCard-warning, #metricCard-danger,
 #metricCard-info, #metricCard-ok, QTableWidget, #dataTable, #dataTree,
 QTreeWidget, QListWidget, #taskGroup, #courseCard, #settingsRow,
@@ -851,6 +918,25 @@ QLineEdit, QComboBox, #baseModal, #searchField, #profileButton,
 #aboutHero {
     background: #0B3B32;
 }
+#accessWindow {
+    background: #071F1B;
+}
+#accessTitle, #accessFieldLabel {
+    color: #E5EEF7;
+}
+#accessSubtitle {
+    color: #9FB0C3;
+}
+#accessInfo {
+    background: #102A44;
+    color: #BFDBFE;
+    border-color: #1D4ED8;
+}
+#accessError {
+    background: #3A1820;
+    color: #FECACA;
+    border-color: #7F1D1D;
+}
 #taskGroupHeader, QHeaderView::section {
     background: #223044;
     color: #E5EEF7;
@@ -860,8 +946,13 @@ QLineEdit, QComboBox, #baseModal, #searchField, #profileButton,
     border-top-color: #2B3A4A;
 }
 #taskRow-overdue:hover, #taskRow-pending:hover, #taskRow-undated:hover,
-#courseCard:hover, #secondaryButton:hover {
+#courseCard:hover, #secondaryButton:hover, #secondarySmallButton:hover, #segment:hover {
     background: #203044;
+}
+#taskRow-overdue:focus, #taskRow-pending:focus, #taskRow-undated:focus, #taskRow-ok:focus,
+#courseCard:focus {
+    background: #203044;
+    border-color: #6EE7B7;
 }
 #pill {
     background: #182331;
@@ -882,6 +973,15 @@ QLineEdit, QComboBox, #baseModal, #searchField, #profileButton,
 #themeToggleDark {
     background: #16775F;
     border-color: #3FD6A5;
+}
+#primarySmallButton:hover {
+    background: #0F5F4A;
+}
+#primarySmallButton:disabled, #secondarySmallButton:disabled,
+#pill:disabled, #pillActive:disabled, #segment:disabled, #segmentActive:disabled {
+    background: #223044;
+    color: #7F91A8;
+    border-color: #2B3A4A;
 }
 QMenu::item:selected, QComboBox QAbstractItemView::item:selected {
     background: #203044;

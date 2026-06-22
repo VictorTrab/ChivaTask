@@ -19,7 +19,7 @@ class TrayController:
         menu = QMenu()
         open_action = QAction("Abrir ChivaTask", parent)
         open_action.triggered.connect(show_window)
-        sync_action = QAction(icons.icon("refresh"), "Sincronizar ahora", parent)
+        sync_action = QAction(icons.icon("refresh", "brand"), "Sincronizar ahora", parent)
         sync_action.triggered.connect(sync_now)
         quit_action = QAction("Salir", parent)
         quit_action.triggered.connect(QApplication.instance().quit)

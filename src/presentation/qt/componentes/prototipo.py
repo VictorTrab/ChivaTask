@@ -127,6 +127,8 @@ class TaskRowCard(QFrame):
         bucket = classify_task(task)
         self.setObjectName(f"taskRow-{CHIP_VARIANT[bucket]}")
         self.setCursor(Qt.PointingHandCursor)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setAccessibleName(f"Tarea: {task.name}")
         self.setMinimumHeight(64 if compact else 76)
         self.setMaximumHeight(78 if compact else 92)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -176,10 +178,17 @@ class TaskRowCard(QFrame):
             self.selected.emit(self.task)
         super().mousePressEvent(event)
 
+    def keyPressEvent(self, event) -> None:
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space):
+            self.selected.emit(self.task)
+            return
+        super().keyPressEvent(event)
+
 
 class CourseCard(QFrame):
     selected = Signal(object)
     view_tasks = Signal(object)
+    open_campus = Signal(object)
 
     def __init__(self, summary: dict[str, object]) -> None:
         super().__init__()
@@ -190,6 +199,8 @@ class CourseCard(QFrame):
         progress = int((submitted / total) * 100) if total else 0
         self.setObjectName("courseCard")
         self.setCursor(Qt.PointingHandCursor)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setAccessibleName(f"Curso: {summary['fullname']}")
         self.setMinimumWidth(300)
         self.setMaximumWidth(860)
         self.setMinimumHeight(194)
@@ -239,10 +250,13 @@ class CourseCard(QFrame):
         tasks_button = QPushButton("Ver tareas")
         tasks_button.setObjectName("secondarySmallButton")
         tasks_button.setMaximumWidth(104)
+        tasks_button.setAccessibleName(f"Ver tareas de {summary['shortname']}")
         tasks_button.clicked.connect(lambda: self.view_tasks.emit(self.summary))
         campus_button = QPushButton("Campus")
         campus_button.setObjectName("primarySmallButton")
         campus_button.setMaximumWidth(86)
+        campus_button.setAccessibleName(f"Abrir campus de {summary['shortname']}")
+        campus_button.clicked.connect(lambda: self.open_campus.emit(self.summary))
         footer.addWidget(pending_label, 1)
         if pending:
             footer.addWidget(tasks_button)
@@ -257,6 +271,12 @@ class CourseCard(QFrame):
         if event.button() == Qt.LeftButton:
             self.selected.emit(self.summary)
         super().mousePressEvent(event)
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space):
+            self.selected.emit(self.summary)
+            return
+        super().keyPressEvent(event)
 
 
 class SettingsRow(QFrame):
@@ -383,6 +403,8 @@ class SegmentedControl(QFrame):
         for label, value in options:
             button = QPushButton(label)
             button.setCheckable(True)
+            button.setFocusPolicy(Qt.StrongFocus)
+            button.setAccessibleName(label)
             button.clicked.connect(lambda _=False, option=value: self.set_value(option))
             layout.addWidget(button)
             self.buttons[value] = button
@@ -414,6 +436,8 @@ class PillFilter(QFrame):
         layout.setSpacing(8)
         for label, value in options:
             button = QPushButton(label)
+            button.setFocusPolicy(Qt.StrongFocus)
+            button.setAccessibleName(label)
             button.clicked.connect(lambda _=False, option=value: self.set_value(option))
             layout.addWidget(button)
             self.buttons[value] = button
