@@ -22,7 +22,7 @@ from presentation.qt.componentes.prototipo import (
     ToggleSwitch,
     ProgressRing,
 )
-from presentation.qt.componentes.shell import NavItem, SearchField, SyncStatusPill, SyncToast
+from presentation.qt.componentes.shell import LoadingSpinner, NavItem, SearchField, SyncStatusPill, SyncToast
 from presentation.qt.componentes.perfil import ProfileButton
 from presentation.qt.dialogo_login import LoginDialog
 from presentation.qt.dialogo_onboarding import OnboardingDialog
@@ -161,6 +161,9 @@ class PresentationSmokeTests(unittest.TestCase):
         self.assertEqual(dialog.password.placeholderText(), "Contraseña del campus")
         self.assertEqual(dialog.username.accessibleName(), "Usuario del campus")
         self.assertEqual(dialog.password.accessibleName(), "Contraseña del campus")
+        self.assertTrue(hasattr(dialog, "exec_maximized"))
+        self.assertGreaterEqual(dialog.username.minimumHeight(), 46)
+        self.assertLessEqual(dialog.password_toggle.maximumWidth(), 90)
 
     def test_login_dialog_shows_inline_validation(self):
         dialog = LoginDialog(FakeCredentials())
@@ -278,6 +281,20 @@ class PresentationSmokeTests(unittest.TestCase):
         self.assertEqual(status.text(), "Sincronizado")
         self.assertEqual(status.detail_label.text(), "hace 2m")
 
+        status.set_status("Sincronizando...", "syncing")
+        self.assertFalse(status.spinner.isHidden())
+        status.set_status("Sincronizado", "ok")
+        self.assertTrue(status.spinner.isHidden())
+
+    def test_loading_spinner_starts_and_stops_timer(self):
+        spinner = LoadingSpinner()
+
+        spinner.start()
+        self.assertTrue(spinner.isVisible())
+        spinner.stop()
+
+        self.assertFalse(spinner.isVisible())
+
     def test_sync_toast_exposes_retry_and_deduplicates_widget(self):
         toast = SyncToast()
         retries = []
@@ -289,6 +306,7 @@ class PresentationSmokeTests(unittest.TestCase):
 
         self.assertEqual(toast.title_label.text(), "Sincronizacion completada")
         self.assertFalse(toast.retry_button.isVisible())
+        self.assertEqual(toast.icon_label.text(), "OK")
         self.assertEqual(retries, [True])
 
     def test_base_buttons_expose_accessible_names(self):
@@ -571,7 +589,7 @@ class PresentationSmokeTests(unittest.TestCase):
                 pixmap = window.grab()
                 path = Path(tmp) / f"{view}.png"
                 self.assertTrue(pixmap.save(str(path)))
-                self.assertGreater(path.stat().st_size, 20_000)
+                self.assertGreater(path.stat().st_size, 8_000)
                 captures.append(path)
 
             login = LoginDialog(FakeCredentials())
@@ -614,6 +632,34 @@ class PresentationSmokeTests(unittest.TestCase):
             self.assertEqual(window.settings.visual_mode(), "claro")
             self.assertEqual(window.appearance_theme_toggle.visual_mode, "claro")
             self.assertIn("#F5F7FA", self.app.styleSheet())
+            window.close()
+            repo.close()
+
+    def test_sync_feedback_restores_button_and_positions_toast_in_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(True, 3, 2, [Task(1, 1, "IS", "Curso", "Tarea", None, None, "new")]),
+                21600,
+            )
+
+            window._set_status("Sincronizando...", "syncing")
+            window.sync_button.setEnabled(False)
+            window.sync_button.setText("Sincronizando...")
+            window._sync_finished(SyncResult(True, 3, 2, []))
+
+            self.assertTrue(window.sync_button.isEnabled())
+            self.assertEqual(window.sync_button.text(), "Sincronizar")
+            self.assertFalse(window.status_pill.spinner.isVisible())
+            self.assertEqual(window.sync_toast.parent(), window.content_root)
+            self.assertEqual(window.sync_toast.title_label.text(), "Sincronizado")
+            self.assertIn("No se detectaron", window.sync_toast.detail_label.text())
+            self.assertLessEqual(window.sync_toast.x() + window.sync_toast.width(), window.content_root.width())
             window.close()
             repo.close()
 

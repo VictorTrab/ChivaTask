@@ -29,7 +29,7 @@ QLabel {
 #accessCard {
     background: #FFFFFF;
     border: 1px solid #D8E2EA;
-    border-radius: 18px;
+    border-radius: 20px;
 }
 #accessTitle {
     color: #102033;
@@ -255,7 +255,7 @@ QLabel {
 #syncToastSuccess, #syncToastError {
     background: #FFFFFF;
     border: 1px solid #D8E2EA;
-    border-radius: 14px;
+    border-radius: 16px;
 }
 #syncToastSuccess {
     border-left: 4px solid #16775F;
@@ -267,6 +267,17 @@ QLabel {
     color: #102033;
     font-size: 13px;
     font-weight: 900;
+}
+#syncToastIcon {
+    background: #E8F5F0;
+    color: #16775F;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 900;
+}
+#syncToastError #syncToastIcon {
+    background: #FEE2E2;
+    color: #DC2626;
 }
 #syncToastDetail {
     color: #64748B;
@@ -289,7 +300,7 @@ QLabel {
 #syncToastRetry {
     background: #FFFFFF;
     border: 1px solid #D8E2EA;
-    border-radius: 9px;
+    border-radius: 10px;
     color: #102033;
     padding: 7px 12px;
     font-weight: 800;
@@ -297,6 +308,9 @@ QLabel {
 #syncToastRetry:hover {
     background: #E8F5F0;
     border-color: #B7E4D4;
+}
+#loadingSpinner {
+    background: transparent;
 }
 #statCard-default, #statCard-warning, #statCard-ok {
     background: white;
@@ -778,7 +792,7 @@ QHeaderView::section {
     background: #16775F;
     color: white;
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 9px 14px;
     font-weight: 800;
 }
@@ -800,7 +814,7 @@ QHeaderView::section {
     background: #FFFFFF;
     color: #102033;
     border: 1px solid #D8E2EA;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 9px 14px;
     font-weight: 700;
 }
@@ -811,7 +825,7 @@ QHeaderView::section {
     background: #FFF5F5;
     color: #DC2626;
     border: 1px solid #FECACA;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 9px 14px;
     font-weight: 700;
 }
@@ -839,7 +853,7 @@ QHeaderView::section {
 QLineEdit, QComboBox {
     background: white;
     border: 1px solid #D8E2EA;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 9px;
 }
 #searchField {
@@ -1001,6 +1015,14 @@ QLineEdit, QComboBox, #baseModal, #searchField, #profileButton,
 }
 #syncToastTitle {
     color: #E5EEF7;
+}
+#syncToastIcon {
+    background: #14352B;
+    color: #6EE7B7;
+}
+#syncToastError #syncToastIcon {
+    background: #3A1820;
+    color: #FECACA;
 }
 #syncToastClose {
     color: #9FB0C3;

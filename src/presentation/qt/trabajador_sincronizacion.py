@@ -17,4 +17,7 @@ class SyncWorker(QObject):
         self.run_sync = run_sync
 
     def run(self) -> None:
-        self.finished.emit(self.run_sync())
+        try:
+            self.finished.emit(self.run_sync())
+        except Exception:
+            self.finished.emit(SyncResult(False, 0, 0, [], "unexpected_error"))

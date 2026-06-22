@@ -22,7 +22,6 @@ class LoginDialog(QDialog):
         self.setModal(True)
         self.setWindowTitle("Conecta tu campus")
         self.setMinimumSize(640, 500)
-        self.resize(780, 540)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(32, 32, 32, 32)
@@ -30,11 +29,11 @@ class LoginDialog(QDialog):
 
         card = QFrame()
         card.setObjectName("accessCard")
-        card.setMaximumWidth(480)
-        card.setMinimumWidth(440)
+        card.setMaximumWidth(600)
+        card.setMinimumWidth(520)
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(28, 28, 28, 28)
-        card_layout.setSpacing(14)
+        card_layout.setContentsMargins(30, 28, 30, 28)
+        card_layout.setSpacing(12)
 
         brand = BrandLockup(header=True)
         title = QLabel("Conecta tu campus")
@@ -53,7 +52,8 @@ class LoginDialog(QDialog):
         self.username = QLineEdit()
         self.username.setAccessibleName("Usuario del campus")
         self.username.setPlaceholderText("usuario@uph.edu.hn")
-        self.username.setMinimumHeight(44)
+        self.username.setMinimumHeight(46)
+        self.username.returnPressed.connect(self.save)
 
         password_label = QLabel("Contraseña")
         password_label.setObjectName("accessFieldLabel")
@@ -61,14 +61,15 @@ class LoginDialog(QDialog):
         self.password.setAccessibleName("Contraseña del campus")
         self.password.setEchoMode(QLineEdit.Password)
         self.password.setPlaceholderText("Contraseña del campus")
-        self.password.setMinimumHeight(44)
+        self.password.setMinimumHeight(46)
         self.password.returnPressed.connect(self.save)
 
         self.password_toggle = QPushButton("Mostrar")
         self.password_toggle.setObjectName("secondarySmallButton")
         self.password_toggle.setAccessibleName("Mostrar u ocultar contraseña")
         self.password_toggle.setCheckable(True)
-        self.password_toggle.setMinimumHeight(44)
+        self.password_toggle.setMinimumHeight(42)
+        self.password_toggle.setMaximumWidth(86)
         self.password_toggle.clicked.connect(self._toggle_password)
 
         password_row = QHBoxLayout()
@@ -104,9 +105,17 @@ class LoginDialog(QDialog):
         root.addWidget(card)
         self.username.setFocus()
 
+    def exec_maximized(self) -> int:
+        self.setWindowState(self.windowState() | Qt.WindowMaximized)
+        return self.exec()
+
     def showEvent(self, event):
         self._fade = fade_in(self)
         super().showEvent(event)
+        self.username.setFocus(Qt.OtherFocusReason)
+
+    def reject(self) -> None:
+        super().reject()
 
     def save(self) -> None:
         self._set_error("")

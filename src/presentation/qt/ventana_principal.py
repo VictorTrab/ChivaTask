@@ -130,7 +130,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self.tray = TrayController(self, self.icons, self.show_normal, self.sync_now)
         self.sync_toast = SyncToast()
-        self.sync_toast.setParent(self)
+        self.sync_toast.setParent(self.content_root)
         self.sync_toast.retry_requested.connect(self.sync_now)
         self.sync_finished.connect(self._sync_finished)
 
@@ -176,9 +176,9 @@ class MainWindow(QMainWindow):
         self.version_label.setObjectName("sidebarMuted")
         sidebar_layout.addWidget(self.version_label)
 
-        content = QWidget()
-        content.setObjectName("contentRoot")
-        content_layout = QVBoxLayout(content)
+        self.content_root = QWidget()
+        self.content_root.setObjectName("contentRoot")
+        content_layout = QVBoxLayout(self.content_root)
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
         content_layout.addLayout(self._build_header())
@@ -194,7 +194,7 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self.footer)
 
         root_layout.addWidget(self.sidebar)
-        root_layout.addWidget(content, 1)
+        root_layout.addWidget(self.content_root, 1)
         self.setCentralWidget(root)
         self._apply_visual_preferences()
         self.navigate("inicio")
@@ -813,8 +813,9 @@ class MainWindow(QMainWindow):
             return
         self.syncing = True
         self._set_data_state("loading")
-        self._set_status("Sincronizando", "syncing")
+        self._set_status("Sincronizando...", "syncing")
         self.sync_button.setEnabled(False)
+        self.sync_button.setText("Sincronizando...")
         self.worker_thread = QThread(self)
         self.worker = SyncWorker(self.run_sync)
         self.worker.moveToThread(self.worker_thread)
@@ -829,6 +830,7 @@ class MainWindow(QMainWindow):
     def _sync_finished(self, result: SyncResult) -> None:
         self.syncing = False
         self.sync_button.setEnabled(True)
+        self.sync_button.setText("Sincronizar")
         self.refresh_from_cache()
         if result.ok:
             self.api_status = "ok"
@@ -836,7 +838,14 @@ class MainWindow(QMainWindow):
             self.error_banner.hide()
             self._set_data_state("success")
             self._set_status("Sincronizado", "ok")
-            self._show_sync_toast("Sincronización completada", f"{result.pending_count} tareas y {result.course_count} cursos actualizados.", "success")
+            if result.changed_pending:
+                self._show_sync_toast(
+                    "Sincronización completada",
+                    f"{result.pending_count} tareas pendientes - {result.course_count} cursos",
+                    "success",
+                )
+            else:
+                self._show_sync_toast("Sincronizado", "No se detectaron cambios nuevos", "success")
             self._notify_changed(result.changed_pending)
         else:
             self.api_status = "error"
@@ -845,7 +854,7 @@ class MainWindow(QMainWindow):
             self.error_banner.show()
             self._set_data_state("offline-cache" if result.pending_count or result.course_count else "recoverable-error")
             self._set_status("Sin conexión", "error")
-            self._show_sync_toast("No se pudo sincronizar", "Se conserva el caché local. Puedes reintentar cuando tengas conexión.", "error", retry=True)
+            self._show_sync_toast("No se pudo sincronizar", "Se mantienen los datos guardados en caché", "error", retry=True)
             if result.error_code == "invalidlogin":
                 if self._exec_login_dialog(hide_shell=True, restore_on_cancel=True):
                     self.sync_now()
@@ -1294,6 +1303,7 @@ class MainWindow(QMainWindow):
         for nav_key, button in self.nav_buttons.items():
             button.set_active(nav_key == key)
         self.footer.setVisible(key in {"inicio", "tareas"})
+        self._position_sync_toast()
 
     def open_selected(self) -> None:
         if self.selected_task and self.selected_task.url:
@@ -1322,17 +1332,30 @@ class MainWindow(QMainWindow):
 
     def _exec_login_dialog(self, hide_shell: bool = False, restore_on_cancel: bool = True) -> bool:
         was_visible = self.isVisible()
+        previous_state = self.windowState()
+        previous_geometry = self.geometry()
         if hide_shell:
             self.hide()
         dialog = LoginDialog(self.credentials)
-        accepted = dialog.exec() == QDialog.Accepted
+        accepted = dialog.exec_maximized() == QDialog.Accepted
         if accepted:
             self.settings.set_onboarding_completed(True)
             if hide_shell:
-                self.show_normal()
+                self._restore_window_state(previous_state, previous_geometry)
         elif hide_shell and restore_on_cancel and was_visible:
-            self.show_normal()
+            self._restore_window_state(previous_state, previous_geometry)
         return accepted
+
+    def _restore_window_state(self, state, geometry) -> None:
+        if state & Qt.WindowFullScreen:
+            self.showFullScreen()
+        elif state & Qt.WindowMaximized:
+            self.showMaximized()
+        else:
+            self.setGeometry(geometry)
+            self.show()
+        self.raise_()
+        self.activateWindow()
 
     def logout_local(self) -> None:
         modal = ConfirmModal(
@@ -1406,8 +1429,11 @@ class MainWindow(QMainWindow):
             return
         margin = 18
         self.sync_toast.adjustSize()
-        x = max(margin, self.width() - self.sync_toast.width() - margin)
-        y = max(margin, self.height() - self.footer.height() - self.sync_toast.height() - margin)
+        root_width = self.content_root.width() if hasattr(self, "content_root") else self.width()
+        root_height = self.content_root.height() if hasattr(self, "content_root") else self.height()
+        footer_height = self.footer.height() if hasattr(self, "footer") and self.footer.isVisible() else 0
+        x = max(margin, root_width - self.sync_toast.width() - margin)
+        y = max(margin, root_height - footer_height - self.sync_toast.height() - margin)
         self.sync_toast.move(x, y)
 
     def _refresh_sync_status_detail(self) -> None:
@@ -1503,7 +1529,12 @@ class MainWindow(QMainWindow):
 
     def show_normal(self) -> None:
         self.tray.reset_background_message()
-        self.show()
+        if self.windowState() & Qt.WindowFullScreen:
+            self.showFullScreen()
+        elif self.windowState() & Qt.WindowMaximized:
+            self.showMaximized()
+        else:
+            self.show()
         self.raise_()
         self.activateWindow()
 

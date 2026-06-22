@@ -30,7 +30,7 @@ pip install -e .
 python src\main.py
 ```
 
-Tambien puedes abrir [src/main.py](C:/Users/User/Documents/PROYECTOS/ChivaTask/src/main.py) y ejecutarlo como archivo Python desde VS Code.
+Tambien puedes abrir `src/main.py` y ejecutarlo como archivo Python desde VS Code.
 
 La primera ejecucion pide usuario y contrasena del campus. No se guardan en archivos: se almacenan con `keyring`, que en Windows usa Credential Manager.
 

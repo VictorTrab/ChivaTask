@@ -3,6 +3,7 @@
 import unittest
 from pathlib import Path
 
+from infrastructure.desktop.autoarranque import startup_command
 from infrastructure.moodle.cliente import MoodleCampusGateway
 from infrastructure.desktop.navegador import SafeDesktopNavigator
 from infrastructure.security.almacen_credenciales import WindowsCredentialRepository
@@ -83,6 +84,29 @@ class SecretRedactionTests(unittest.TestCase):
             {"username": "***", "password": "***", "nested": {"wstoken": "***"}, "safe": "value"},
         )
         self.assertEqual(redact_secrets(message), "wstoken=*** password=*** usuario=***")
+
+
+class PortablePathTests(unittest.TestCase):
+    def test_no_personal_developer_paths_are_hardcoded(self):
+        root = Path(__file__).resolve().parents[1]
+        forbidden = ("C:/Users/User/Documents/PROYECTOS/ChivaTask", "C:\\Users\\User\\Documents\\PROYECTOS\\ChivaTask")
+        allowed = {root / "tests" / "test_seguridad.py"}
+        offenders = []
+        for path in [*root.glob("src/**/*.py"), *root.glob("tests/**/*.py"), root / "README.md"]:
+            if path in allowed:
+                continue
+            text = path.read_text(encoding="utf-8")
+            if any(item in text for item in forbidden):
+                offenders.append(str(path.relative_to(root)))
+
+        self.assertEqual(offenders, [])
+
+    def test_autostart_command_uses_dynamic_entrypoint(self):
+        command = startup_command()
+
+        self.assertIn("src", command)
+        self.assertIn("main.py", command)
+        self.assertNotIn("C:/Users/User/Documents/PROYECTOS/ChivaTask", command)
 
 
 class FakeResponse:

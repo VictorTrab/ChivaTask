@@ -25,7 +25,7 @@ def main() -> int:
     apply_application_theme(settings.visual_mode())
     if not runtime.credential_repository.has_credentials():
         login = LoginDialog(runtime.credential_repository)
-        if login.exec() != QDialog.Accepted:
+        if login.exec_maximized() != QDialog.Accepted:
             runtime.task_repository.close()
             return 0
         settings.set_onboarding_completed(True)
@@ -38,5 +38,5 @@ def main() -> int:
         run_sync=runtime.run_sync,
         sync_interval_seconds=runtime.sync_interval_seconds,
     )
-    window.show()
+    window.showMaximized()
     return app.exec()

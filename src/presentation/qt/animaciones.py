@@ -14,6 +14,10 @@ def set_animations_enabled(enabled: bool) -> None:
     _ANIMATIONS_ENABLED = enabled
 
 
+def animations_enabled() -> bool:
+    return _ANIMATIONS_ENABLED
+
+
 def fade_in(widget: QWidget, duration_ms: int = 160) -> QPropertyAnimation:
     if not _ANIMATIONS_ENABLED:
         widget.setWindowOpacity(1.0)
