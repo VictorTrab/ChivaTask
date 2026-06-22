@@ -7,6 +7,14 @@ QMainWindow, #appRoot, #contentRoot, QStackedWidget {
     font-family: "Segoe UI", Arial, sans-serif;
     font-size: 13px;
 }
+#pageRoot, #homeMain, #homeSide, #homeSections, #taskListContent,
+#courseListContent, #scrollContent, #scrollViewport {
+    background: #F5F7FA;
+}
+QAbstractScrollArea, QAbstractScrollArea::viewport {
+    background: transparent;
+    border: none;
+}
 QWidget {
     color: #102033;
     font-family: "Segoe UI", Arial, sans-serif;
@@ -210,11 +218,15 @@ QLabel {
     font-weight: 700;
     max-width: 240px;
 }
-#statusText, #statusIcon {
+#statusText, #statusDetail, #statusIcon {
     background: transparent;
 }
 #statusText {
     font-weight: 800;
+}
+#statusDetail {
+    font-size: 12px;
+    font-weight: 700;
 }
 #statusOk {
     background: #F0FBF5;
@@ -239,6 +251,52 @@ QLabel {
 }
 #statusError #statusText {
     color: #DC2626;
+}
+#syncToastSuccess, #syncToastError {
+    background: #FFFFFF;
+    border: 1px solid #D8E2EA;
+    border-radius: 14px;
+}
+#syncToastSuccess {
+    border-left: 4px solid #16775F;
+}
+#syncToastError {
+    border-left: 4px solid #DC2626;
+}
+#syncToastTitle {
+    color: #102033;
+    font-size: 13px;
+    font-weight: 900;
+}
+#syncToastDetail {
+    color: #64748B;
+    font-size: 12px;
+}
+#syncToastClose {
+    background: transparent;
+    border: none;
+    color: #64748B;
+    font-size: 18px;
+    font-weight: 800;
+    min-width: 28px;
+    min-height: 28px;
+}
+#syncToastClose:hover {
+    color: #102033;
+    background: #F1F5F9;
+    border-radius: 8px;
+}
+#syncToastRetry {
+    background: #FFFFFF;
+    border: 1px solid #D8E2EA;
+    border-radius: 9px;
+    color: #102033;
+    padding: 7px 12px;
+    font-weight: 800;
+}
+#syncToastRetry:hover {
+    background: #E8F5F0;
+    border-color: #B7E4D4;
 }
 #statCard-default, #statCard-warning, #statCard-ok {
     background: white;
@@ -456,15 +514,51 @@ QTreeWidget::item:selected, QListWidget::item:selected {
     font-size: 14px;
     font-weight: 900;
 }
-#courseProgress, #ringBar {
+#courseProgress-ok, #courseProgress-warning, #courseProgress-info, #ringBar {
     border: none;
     background: #EEF3F7;
     border-radius: 4px;
     height: 8px;
 }
-#courseProgress::chunk, #ringBar::chunk {
+#courseProgress-ok::chunk, #ringBar::chunk {
     background: #16775F;
     border-radius: 4px;
+}
+#courseProgress-warning::chunk {
+    background: #D97706;
+    border-radius: 4px;
+}
+#courseProgress-info::chunk {
+    background: #2563EB;
+    border-radius: 4px;
+}
+#coursePercent-ok, #coursePercent-warning, #coursePercent-info {
+    font-size: 12px;
+    font-weight: 900;
+}
+#coursePercent-ok {
+    color: #047857;
+}
+#coursePercent-warning {
+    color: #B45309;
+}
+#coursePercent-info {
+    color: #2563EB;
+}
+#courseProgressPanel {
+    background: #F8FAFC;
+    border: 1px solid #E8EEF4;
+    border-radius: 12px;
+}
+#courseDetailPercent {
+    color: #102033;
+    font-size: 24px;
+    font-weight: 900;
+}
+#coursePreviewText {
+    color: #102033;
+    font-size: 13px;
+    font-weight: 700;
 }
 #primarySmallButton, #secondarySmallButton {
     border-radius: 9px;
@@ -857,6 +951,10 @@ QMainWindow, #appRoot, #contentRoot, QStackedWidget {
     background: #101820;
     color: #E5EEF7;
 }
+#pageRoot, #homeMain, #homeSide, #homeSections, #taskListContent,
+#courseListContent, #scrollContent, #scrollViewport {
+    background: #101820;
+}
 QWidget {
     color: #E5EEF7;
 }
@@ -869,7 +967,7 @@ QWidget {
     color: #E5EEF7;
 }
 #subtitle, #muted, #taskRowMeta, #taskRowDate, #courseCode, #courseMeta,
-#settingsRowSubtitle, #progressRingLabel, #calendarDow {
+#settingsRowSubtitle, #progressRingLabel, #calendarDow, #statusDetail {
     color: #9FB0C3;
 }
 #footer, #detailPanel, #settingsCard, #accessCard, #statCard-default, #statCard-warning,
@@ -879,7 +977,8 @@ QTreeWidget, QListWidget, #taskGroup, #courseCard, #settingsRow,
 #segmentedControl, #progressRing, #miniCalendar, #emptyState, #secondaryButton,
 QLineEdit, QComboBox, #baseModal, #searchField, #profileButton,
 #infoCard-default, #infoCard-warning, #infoCard-ok, #profileSettingsCard,
-#settingsInfoList, QMenu, QComboBox QAbstractItemView {
+#settingsInfoList, QMenu, QComboBox QAbstractItemView,
+#syncToastSuccess, #syncToastError, #syncToastRetry, #courseProgressPanel {
     background: #182331;
     color: #E5EEF7;
     border-color: #2B3A4A;
@@ -892,11 +991,47 @@ QLineEdit, QComboBox, #baseModal, #searchField, #profileButton,
     background: #14352B;
     color: #6EE7B7;
 }
-#profileName, #infoCardValue, #profileSettingsName, #settingsInfoValue {
+#profileName, #infoCardValue, #profileSettingsName, #settingsInfoValue,
+#courseDetailPercent, #coursePreviewText {
     color: #E5EEF7;
 }
-#profileCaption, #infoCardLabel, #profileSettingsUsername, #settingsInfoLabel {
+#profileCaption, #infoCardLabel, #profileSettingsUsername, #settingsInfoLabel,
+#syncToastDetail {
     color: #9FB0C3;
+}
+#syncToastTitle {
+    color: #E5EEF7;
+}
+#syncToastClose {
+    color: #9FB0C3;
+}
+#syncToastClose:hover, #syncToastRetry:hover {
+    background: #203044;
+    color: #E5EEF7;
+}
+#statusOk {
+    background: #14352B;
+    color: #6EE7B7;
+    border-color: #16775F;
+}
+#statusOk #statusText {
+    color: #6EE7B7;
+}
+#statusPending, #statusSyncing {
+    background: #102A44;
+    color: #BFDBFE;
+    border-color: #1D4ED8;
+}
+#statusPending #statusText, #statusSyncing #statusText {
+    color: #BFDBFE;
+}
+#statusError {
+    background: #3A1820;
+    color: #FECACA;
+    border-color: #7F1D1D;
+}
+#statusError #statusText {
+    color: #FECACA;
 }
 #settingsInfoRow {
     border-bottom-color: #2B3A4A;
@@ -945,6 +1080,18 @@ QLineEdit, QComboBox, #baseModal, #searchField, #profileButton,
     background: #182331;
     border-top-color: #2B3A4A;
 }
+#courseProgress-ok, #courseProgress-warning, #courseProgress-info {
+    background: #223044;
+}
+#coursePercent-ok {
+    color: #6EE7B7;
+}
+#coursePercent-warning {
+    color: #FBBF24;
+}
+#coursePercent-info {
+    color: #93C5FD;
+}
 #taskRow-overdue:hover, #taskRow-pending:hover, #taskRow-undated:hover,
 #courseCard:hover, #secondaryButton:hover, #secondarySmallButton:hover, #segment:hover {
     background: #203044;
@@ -976,6 +1123,30 @@ QLineEdit, QComboBox, #baseModal, #searchField, #profileButton,
 }
 #primarySmallButton:hover {
     background: #0F5F4A;
+}
+#primaryButton, #dangerPrimaryButton {
+    background: #16775F;
+    color: #FFFFFF;
+    border: none;
+}
+#primaryButton:hover {
+    background: #0F5F4A;
+}
+#secondarySmallButton {
+    background: #182331;
+    color: #E5EEF7;
+    border-color: #2B3A4A;
+}
+#secondarySmallButton:hover {
+    background: #203044;
+    color: #E5EEF7;
+    border-color: #16775F;
+}
+#primaryButton:disabled, #secondaryButton:disabled, #dangerButton:disabled,
+#dangerPrimaryButton:disabled {
+    background: #223044;
+    color: #7F91A8;
+    border: 1px solid #2B3A4A;
 }
 #primarySmallButton:disabled, #secondarySmallButton:disabled,
 #pill:disabled, #pillActive:disabled, #segment:disabled, #segmentActive:disabled {

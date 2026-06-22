@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QSizePolicy
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy, QVBoxLayout
 
 
 class NavItem(QFrame):
@@ -82,20 +82,25 @@ class SyncStatusPill(QFrame):
         self.icon = icon
         self.setObjectName("statusPending")
         self.setMinimumHeight(36)
-        self.setMaximumWidth(260)
+        self.setMaximumWidth(300)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 7, 12, 7)
-        layout.setSpacing(8)
+        layout.setSpacing(7)
         self.icon_label = QLabel()
         self.icon_label.setObjectName("statusIcon")
         self.icon_label.setPixmap(icon.pixmap(14, 14))
         self.text_label = QLabel("Sin sincronizar")
         self.text_label.setObjectName("statusText")
+        self.detail_label = QLabel("")
+        self.detail_label.setObjectName("statusDetail")
         layout.addWidget(self.icon_label)
         layout.addWidget(self.text_label)
+        layout.addWidget(self.detail_label)
 
-    def set_status(self, text: str, variant: str) -> None:
+    def set_status(self, text: str, variant: str, detail: str = "") -> None:
         self.text_label.setText(text)
+        self.detail_label.setText(detail)
+        self.detail_label.setVisible(bool(detail))
         self.setObjectName(
             {
                 "ok": "statusOk",
@@ -115,5 +120,61 @@ class SyncStatusPill(QFrame):
     def _refresh_style(self) -> None:
         self.style().unpolish(self)
         self.style().polish(self)
-        self.text_label.style().unpolish(self.text_label)
-        self.text_label.style().polish(self.text_label)
+        for child in (self.text_label, self.detail_label):
+            child.style().unpolish(child)
+            child.style().polish(child)
+
+
+class SyncToast(QFrame):
+    retry_requested = Signal()
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("syncToastSuccess")
+        self.setWindowFlags(Qt.Widget)
+        self.setFixedWidth(340)
+        self.hide()
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self.hide)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(8)
+        header = QHBoxLayout()
+        header.setSpacing(8)
+        self.title_label = QLabel("")
+        self.title_label.setObjectName("syncToastTitle")
+        self.close_button = QPushButton("x")
+        self.close_button.setObjectName("syncToastClose")
+        self.close_button.setAccessibleName("Cerrar aviso de sincronización")
+        self.close_button.clicked.connect(self.hide)
+        header.addWidget(self.title_label, 1)
+        header.addWidget(self.close_button)
+        self.detail_label = QLabel("")
+        self.detail_label.setObjectName("syncToastDetail")
+        self.detail_label.setWordWrap(True)
+        self.retry_button = QPushButton("Reintentar")
+        self.retry_button.setObjectName("syncToastRetry")
+        self.retry_button.setAccessibleName("Reintentar sincronización")
+        self.retry_button.clicked.connect(self.retry_requested.emit)
+        layout.addLayout(header)
+        layout.addWidget(self.detail_label)
+        layout.addWidget(self.retry_button, 0, Qt.AlignRight)
+
+    def show_message(self, title: str, detail: str, variant: str, retry: bool = False) -> None:
+        self.setObjectName("syncToastError" if variant == "error" else "syncToastSuccess")
+        self.title_label.setText(title)
+        self.detail_label.setText(detail)
+        self.retry_button.setVisible(retry)
+        self._refresh_style()
+        self.show()
+        self.raise_()
+        self._timer.start(7000 if variant == "error" else 4200)
+
+    def _refresh_style(self) -> None:
+        self.style().unpolish(self)
+        self.style().polish(self)
+        for child in (self.title_label, self.detail_label, self.close_button, self.retry_button):
+            child.style().unpolish(child)
+            child.style().polish(child)

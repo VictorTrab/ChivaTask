@@ -22,7 +22,7 @@ from presentation.qt.componentes.prototipo import (
     ToggleSwitch,
     ProgressRing,
 )
-from presentation.qt.componentes.shell import NavItem, SearchField, SyncStatusPill
+from presentation.qt.componentes.shell import NavItem, SearchField, SyncStatusPill, SyncToast
 from presentation.qt.componentes.perfil import ProfileButton
 from presentation.qt.dialogo_login import LoginDialog
 from presentation.qt.dialogo_onboarding import OnboardingDialog
@@ -268,7 +268,7 @@ class PresentationSmokeTests(unittest.TestCase):
         search = SearchField(icons.icon("search", "muted"), "Buscar...")
         status = SyncStatusPill(icons.icon("check", "brand"))
 
-        status.set_status("Sincronizado", "ok")
+        status.set_status("Sincronizado", "ok", "hace 2m")
 
         self.assertEqual(nav.accessibleName(), "Tareas")
         self.assertEqual(nav.text_label.text(), "Tareas")
@@ -276,6 +276,20 @@ class PresentationSmokeTests(unittest.TestCase):
         self.assertEqual(nav.objectName(), "navItemActive")
         self.assertEqual(search.objectName(), "searchField")
         self.assertEqual(status.text(), "Sincronizado")
+        self.assertEqual(status.detail_label.text(), "hace 2m")
+
+    def test_sync_toast_exposes_retry_and_deduplicates_widget(self):
+        toast = SyncToast()
+        retries = []
+        toast.retry_requested.connect(lambda: retries.append(True))
+
+        toast.show_message("No se pudo sincronizar", "Usando cache local.", "error", retry=True)
+        toast.retry_button.click()
+        toast.show_message("Sincronizacion completada", "Datos actualizados.", "success")
+
+        self.assertEqual(toast.title_label.text(), "Sincronizacion completada")
+        self.assertFalse(toast.retry_button.isVisible())
+        self.assertEqual(retries, [True])
 
     def test_base_buttons_expose_accessible_names(self):
         icons = IconRegistry()
@@ -401,10 +415,11 @@ class PresentationSmokeTests(unittest.TestCase):
                 21600,
             )
 
-            stylesheet = window.styleSheet()
+            stylesheet = self.app.styleSheet()
 
             self.assertIn("#101820", stylesheet)
             self.assertNotIn("font-size: 19px", stylesheet)
+            self.assertEqual(window.styleSheet(), "")
             self.assertIsNone(repo.get_setting("ui_density"))
             window.close()
             repo.close()
@@ -437,8 +452,35 @@ class PresentationSmokeTests(unittest.TestCase):
             self.assertEqual(window.course_detail_title.text(), "IS")
             self.assertEqual(window.course_fullname_label.text(), "Curso de Ingenieria")
             self.assertEqual(window.course_pending_card.value_label.text(), "1 pendiente")
-            self.assertIn("2 de 3 entregadas", window.course_progress_card.value_label.text())
-            self.assertIn("Proyecto", window.course_preview_card.value_label.text())
+            self.assertEqual(window.course_progress_percent.text(), "66%")
+            self.assertIn("2 de 3 entregadas", window.course_progress_text.text())
+            self.assertIn("Proyecto", window.course_tasks_label.text())
+            window.close()
+            repo.close()
+
+    def test_courses_view_uses_segmented_filter_and_metrics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = SQLiteTaskRepository(Path(tmp) / "cache.db")
+            overdue = Task(10, 1, "IS", "Curso IS", "Proyecto", 1, None, "new")
+            repo.upsert_courses([Course(1, "IS", "Curso IS", True), Course(2, "MA", "Curso MA", True)])
+            repo.upsert_tasks([overdue, Task(20, 2, "MA", "Curso MA", "Tarea", None, None, "new")])
+            window = MainWindow(
+                repo,
+                FakeCredentials(),
+                FakeNotifier(),
+                FakeNavigator(),
+                FakeAutostart(),
+                lambda: SyncResult(False, 0, 0, [], "missing_credentials"),
+                21600,
+            )
+
+            window.refresh_course_list()
+
+            self.assertIsInstance(window.course_filter, SegmentedControl)
+            self.assertEqual(window.course_total_metric.value_label.text(), "2")
+            self.assertEqual(window.course_pending_metric.value_label.text(), "2")
+            self.assertEqual(window.course_overdue_metric.value_label.text(), "1")
+            self.assertFalse(any("Ctrl" in button.text() for button in window.findChildren(QPushButton)))
             window.close()
             repo.close()
 
@@ -560,16 +602,18 @@ class PresentationSmokeTests(unittest.TestCase):
             )
 
             self.assertEqual(window.settings.visual_mode(), "claro")
-            window.header_theme_toggle.click()
+            self.assertFalse(hasattr(window, "header_theme_toggle"))
+            window.appearance_theme_toggle.click()
 
             self.assertEqual(window.settings.visual_mode(), "oscuro")
-            self.assertEqual(window.header_theme_toggle.visual_mode, "oscuro")
             self.assertEqual(window.appearance_theme_toggle.visual_mode, "oscuro")
+            self.assertIn("#101820", self.app.styleSheet())
 
             window.appearance_theme_toggle.click()
 
             self.assertEqual(window.settings.visual_mode(), "claro")
-            self.assertEqual(window.header_theme_toggle.visual_mode, "claro")
+            self.assertEqual(window.appearance_theme_toggle.visual_mode, "claro")
+            self.assertIn("#F5F7FA", self.app.styleSheet())
             window.close()
             repo.close()
 

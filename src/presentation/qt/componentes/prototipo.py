@@ -197,19 +197,22 @@ class CourseCard(QFrame):
         total = int(summary["total"])
         submitted = int(summary["submitted"])
         progress = int((submitted / total) * 100) if total else 0
+        tasks = summary.get("tasks", [])
+        has_overdue = any(classify_task(task) == TaskBucket.OVERDUE for task in tasks)
+        progress_variant = "warning" if has_overdue else "ok" if pending == 0 else "info"
         self.setObjectName("courseCard")
         self.setCursor(Qt.PointingHandCursor)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setAccessibleName(f"Curso: {summary['fullname']}")
         self.setMinimumWidth(300)
-        self.setMaximumWidth(860)
-        self.setMinimumHeight(194)
-        self.setMaximumHeight(220)
+        self.setMaximumWidth(620)
+        self.setMinimumHeight(174)
+        self.setMaximumHeight(196)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 16, 18, 14)
-        layout.setSpacing(10)
+        layout.setContentsMargins(18, 14, 18, 14)
+        layout.setSpacing(8)
         header = QHBoxLayout()
         header.setSpacing(12)
 
@@ -223,25 +226,34 @@ class CourseCard(QFrame):
         code = QLabel(str(summary["shortname"]))
         code.setObjectName("courseCode")
         fullname = str(summary["fullname"])
-        name = QLabel(elided(fullname, 58))
+        name = QLabel(elided(fullname, 52))
         name.setObjectName("courseName")
-        name.setWordWrap(True)
         name.setToolTip(fullname)
+        name.setMaximumHeight(22)
         titles.addWidget(code)
         titles.addWidget(name)
 
-        status = StatusChip("Al día" if pending == 0 else "Pendiente", "ok" if pending == 0 else "overdue")
-        status.setMaximumWidth(92)
+        status_text = "Con vencidas" if has_overdue else "Al día" if pending == 0 else "Pendiente"
+        status_variant = "overdue" if has_overdue else "ok" if pending == 0 else "undated"
+        status = StatusChip(status_text, status_variant)
+        status.setMaximumWidth(112)
         header.addWidget(initials)
         header.addLayout(titles, 1)
         header.addWidget(status)
 
+        progress_row = QHBoxLayout()
+        progress_row.setSpacing(8)
         progress_label = QLabel(f"{submitted} de {total} entregadas")
         progress_label.setObjectName("courseMeta")
+        percent_label = QLabel(f"{progress}%")
+        percent_label.setObjectName(f"coursePercent-{progress_variant}")
+        progress_row.addWidget(progress_label, 1)
+        progress_row.addWidget(percent_label)
         bar = QProgressBar()
-        bar.setObjectName("courseProgress")
+        bar.setObjectName(f"courseProgress-{progress_variant}")
         bar.setRange(0, 100)
         bar.setValue(progress)
+        bar.setTextVisible(False)
 
         footer = QHBoxLayout()
         footer.setSpacing(8)
@@ -263,7 +275,7 @@ class CourseCard(QFrame):
         footer.addWidget(campus_button)
 
         layout.addLayout(header)
-        layout.addWidget(progress_label)
+        layout.addLayout(progress_row)
         layout.addWidget(bar)
         layout.addLayout(footer)
 
@@ -414,6 +426,9 @@ class SegmentedControl(QFrame):
         self.selected = value
         self._refresh()
         self.changed.emit(value)
+
+    def currentData(self) -> str:  # noqa: N802 - compatibilidad con controles de filtro
+        return self.selected
 
     def _refresh(self) -> None:
         for value, button in self.buttons.items():

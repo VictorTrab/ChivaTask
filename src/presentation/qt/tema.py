@@ -1,5 +1,9 @@
 """Tokens visuales de ChivaTask para mantener consistencia."""
 
+from PySide6.QtWidgets import QApplication
+
+from .estilos import app_stylesheet
+
 APP_DISPLAY_NAME = "ChivaTask"
 
 COLOR_VERDE_PROFUNDO = "#123F35"
@@ -18,3 +22,9 @@ RADIO_BOTON = 10
 RADIO_CARD = 12
 RADIO_MODAL = 14
 
+
+def apply_application_theme(visual_mode: str = "claro") -> None:
+    """Aplica el QSS global para ventanas, dialogos y popups."""
+    app = QApplication.instance()
+    if app is not None:
+        app.setStyleSheet(app_stylesheet(visual_mode))

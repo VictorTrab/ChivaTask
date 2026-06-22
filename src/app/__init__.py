@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QApplication, QDialog
 from application.servicio_ajustes import SettingsService
 from presentation.qt import MainWindow
 from presentation.qt.dialogo_login import LoginDialog
-from presentation.qt.estilos import app_stylesheet
+from presentation.qt.tema import apply_application_theme
 
 from .arranque import build_runtime
 
@@ -22,10 +22,9 @@ def main() -> int:
     runtime = build_runtime()
     settings = SettingsService(runtime.task_repository, runtime.autostart)
     settings.cleanup_legacy_settings()
-    app.setStyleSheet(app_stylesheet(settings.visual_mode()))
+    apply_application_theme(settings.visual_mode())
     if not runtime.credential_repository.has_credentials():
         login = LoginDialog(runtime.credential_repository)
-        login.setStyleSheet(app.styleSheet())
         if login.exec() != QDialog.Accepted:
             runtime.task_repository.close()
             return 0
